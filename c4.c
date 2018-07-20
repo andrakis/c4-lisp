@@ -47,6 +47,7 @@ enum { Tk, Hash, Name, Class, Type, Val, HClass, HType, HVal, Idsz };
 void next()
 {
   char *pp;
+  int t, tt;
 
   while (tk = *p) {
     ++p;
@@ -95,6 +96,19 @@ void next()
       if (*p == '/') {
         ++p;
         while (*p != 0 && *p != '\n') ++p;
+      }
+      else if (*p == '*') {
+        ++p;
+        t = 0;
+        while (*p != 0 && t == 0) {
+            pp = p + 1;
+            if(*p == '\n')
+              line++;
+            else if(*p == '*' && *pp == '/')
+               t = 1;
+            ++p;
+        }
+        ++p;
       }
       else {
         tk = Div;
@@ -524,4 +538,6 @@ int main(int argc, char **argv)
     else if (i == EXIT) { printf("exit(%d) cycle = %d\n", *sp, cycle); return *sp; }
     else { printf("unknown instruction = %d! cycle = %d\n", i, cycle); return -1; }
   }
+
+  return 0;
 }
