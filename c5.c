@@ -464,7 +464,7 @@ int *create_process(char *source, int argc, char **argv) {
 	int *bp, *sp, *pc;
 	int *t, i, bt, ty;
 	int *process, *idmain, poolsz;
-	poolsz = 512*1024; // arbitrary size
+	poolsz = 256*1024; // arbitrary size
 
 	if (!(process = (int*)malloc(__B * sizeof(int)))) { printf("Could not malloc(%d) process space\n", __B); return 0; }
 
@@ -631,7 +631,7 @@ void free_process(int *process) {
 int main(int argc, char **argv)
 {
 	int fd;
-	int *processes, *process, proc_max, proc_count;
+	int *processes, *process, proc_max, proc_count, copies;
 	char *pp;
 	int i, ii, srcsize, cycle_count;
 
@@ -648,34 +648,43 @@ int main(int argc, char **argv)
 	if (argc < 1) { printf("usage: c5 [-s] [-d] file file...\n"); return -1; }
 
 	// Allocate processes
-	proc_max = 1;
+	proc_max = 32;
 	proc_count = 0;
 	if (!(processes = (int*)malloc(proc_max * sizeof(int)))) { printf("Failed to allocate processes area\n"); }
+	memset(processes, 0, proc_max * sizeof(int));
 
-	if ((fd = open(*argv, 0)) < 0) { printf("could not open(%s)\n", *argv); return -1; }
-	srcsize = fdsize(fd) + 1;
+	// How many processes to start?
+	copies = 1;
+	while(copies > 0) {
+		if ((fd = open(*argv, 0)) < 0) { printf("could not open(%s)\n", *argv); return -1; }
+		srcsize = fdsize(fd) + 1;
 
-	if (!(p = pp = malloc(srcsize))) { printf("could not malloc(%d) source area\n", srcsize); return -1; }
-	if ((i = read(fd, p, srcsize)) <= 0) { printf("read() returned %d\n", i); return -1; }
-	p[i] = 0;
-	close(fd);
-
-	process = create_process(p, argc, argv);
-	free((void*)pp);
-	if(process == 0) { printf("Invalid process\n"); return -1; }
-	processes[proc_count++] = (int)process;
+		if (!(p = pp = malloc(srcsize))) { printf("could not malloc(%d) source area\n", srcsize); return -1; }
+		if ((i = read(fd, p, srcsize)) <= 0) { printf("read() returned %d\n", i); return -1; }
+		p[i] = 0;
+		close(fd);
+		process = create_process(p, argc, argv);
+		free((void*)pp);
+		if(process == 0) { printf("Invalid process\n"); return -1; }
+		processes[proc_count++] = (int)process;
+		--copies;
+	}
 
 	// run...
 	i = 0;
 	while(proc_count > 0) {
-		process = (int*)processes[i % proc_count];
-		if(process && run_cycle(process, cycle_count) == 1) {
-			// Finished
-			printf("Proc %d finished: %d\n", i, process[B_exitcode]);
-			free_process(process);
-			processes[i] = 0;
-			--proc_count;
+		process = (int*)processes[i];
+		if(process) {
+			if(run_cycle(process, cycle_count) == 1) {
+				// Finished
+				printf("Proc %d finished: %d\n", i, process[B_exitcode]);
+				free_process(process);
+				processes[i] = 0;
+				--proc_count;
+			}
 		}
+		++i;
+		if(i == proc_max) i = 0;
 	}
 
 	free((void*)processes);
