@@ -1,0 +1,142 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configurationDescriptor version="97">
+  <logicalFolder name="root" displayName="root" projectFiles="true" kind="ROOT">
+    <logicalFolder name="HeaderFiles"
+                   displayName="Header Files"
+                   projectFiles="true">
+      <itemPath>extras.h</itemPath>
+      <itemPath>internal.h</itemPath>
+      <itemPath>native.h</itemPath>
+      <itemPath>syscalls.h</itemPath>
+    </logicalFolder>
+    <logicalFolder name="ResourceFiles"
+                   displayName="Resource Files"
+                   projectFiles="true">
+    </logicalFolder>
+    <logicalFolder name="SourceFiles"
+                   displayName="Source Files"
+                   projectFiles="true">
+      <itemPath>LICENSE</itemPath>
+      <itemPath>Makefile</itemPath>
+      <itemPath>c5.c</itemPath>
+      <itemPath>extras.c</itemPath>
+      <itemPath>internal.cpp</itemPath>
+      <itemPath>lisp4.c</itemPath>
+      <itemPath>main.cpp</itemPath>
+      <itemPath>syscalls.c</itemPath>
+    </logicalFolder>
+    <logicalFolder name="TestFiles"
+                   displayName="Test Files"
+                   projectFiles="false"
+                   kind="TEST_LOGICAL_FOLDER">
+    </logicalFolder>
+    <logicalFolder name="ExternalFiles"
+                   displayName="Important Files"
+                   projectFiles="false"
+                   kind="IMPORTANT_FILES_FOLDER">
+      <itemPath>Makefile</itemPath>
+    </logicalFolder>
+  </logicalFolder>
+  <sourceRootList>
+    <Elem>.</Elem>
+  </sourceRootList>
+  <projectmakefile>Makefile</projectmakefile>
+  <confs>
+    <conf name="Debug" type="1">
+      <toolsSet>
+        <compilerSet>GNU|GNU</compilerSet>
+        <dependencyChecking>true</dependencyChecking>
+        <rebuildPropChanged>false</rebuildPropChanged>
+      </toolsSet>
+      <compileType>
+        <cTool>
+          <incDir>
+            <pElem>.</pElem>
+          </incDir>
+          <commandLine>-Wno-format</commandLine>
+        </cTool>
+        <ccTool>
+          <standard>8</standard>
+          <incDir>
+            <pElem>.</pElem>
+          </incDir>
+          <commandLine>-Wno-format</commandLine>
+        </ccTool>
+      </compileType>
+      <item path="LICENSE" ex="false" tool="3" flavor2="0">
+      </item>
+      <item path="Makefile" ex="false" tool="3" flavor2="0">
+      </item>
+      <item path="c5.c" ex="false" tool="0" flavor2="0">
+      </item>
+      <item path="extras.c" ex="false" tool="0" flavor2="0">
+      </item>
+      <item path="extras.h" ex="false" tool="3" flavor2="0">
+      </item>
+      <item path="internal.cpp" ex="false" tool="1" flavor2="0">
+      </item>
+      <item path="internal.h" ex="false" tool="3" flavor2="0">
+      </item>
+      <item path="main.cpp" ex="false" tool="1" flavor2="0">
+      </item>
+      <item path="native.h" ex="false" tool="3" flavor2="0">
+      </item>
+      <item path="syscalls.c" ex="false" tool="0" flavor2="0">
+      </item>
+      <item path="syscalls.h" ex="false" tool="3" flavor2="0">
+      </item>
+    </conf>
+    <conf name="Release" type="1">
+      <toolsSet>
+        <compilerSet>default</compilerSet>
+        <dependencyChecking>true</dependencyChecking>
+        <rebuildPropChanged>false</rebuildPropChanged>
+      </toolsSet>
+      <compileType>
+        <cTool>
+          <developmentMode>5</developmentMode>
+          <incDir>
+            <pElem>.</pElem>
+          </incDir>
+          <commandLine>-Wno-format</commandLine>
+        </cTool>
+        <ccTool>
+          <developmentMode>5</developmentMode>
+          <standard>8</standard>
+          <incDir>
+            <pElem>.</pElem>
+          </incDir>
+          <commandLine>-Wno-format</commandLine>
+        </ccTool>
+        <fortranCompilerTool>
+          <developmentMode>5</developmentMode>
+        </fortranCompilerTool>
+        <asmTool>
+          <developmentMode>5</developmentMode>
+        </asmTool>
+      </compileType>
+      <item path="LICENSE" ex="false" tool="3" flavor2="0">
+      </item>
+      <item path="Makefile" ex="false" tool="3" flavor2="0">
+      </item>
+      <item path="c5.c" ex="false" tool="0" flavor2="0">
+      </item>
+      <item path="extras.c" ex="false" tool="0" flavor2="0">
+      </item>
+      <item path="extras.h" ex="false" tool="3" flavor2="0">
+      </item>
+      <item path="internal.cpp" ex="false" tool="1" flavor2="0">
+      </item>
+      <item path="internal.h" ex="false" tool="3" flavor2="0">
+      </item>
+      <item path="main.cpp" ex="false" tool="1" flavor2="0">
+      </item>
+      <item path="native.h" ex="false" tool="3" flavor2="0">
+      </item>
+      <item path="syscalls.c" ex="false" tool="0" flavor2="0">
+      </item>
+      <item path="syscalls.h" ex="false" tool="3" flavor2="0">
+      </item>
+    </conf>
+  </confs>
+</configurationDescriptor>
