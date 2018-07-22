@@ -632,7 +632,7 @@ int main(int argc, char **argv)
 {
 	int fd;
 	int *processes, *process, proc_max, proc_count, copies;
-	char *pp;
+	char *pp, *tmp;
 	int i, ii, srcsize, cycle_count;
 
 	cycle_count = 1000;
@@ -642,32 +642,38 @@ int main(int argc, char **argv)
 	data = 0;
 	B_MAGIC = 0xBEEF;
 
-	--argc; ++argv;
-	if (argc > 0 && **argv == '-' && (*argv)[1] == 's') { src = 1; --argc; ++argv; }
-	if (argc > 0 && **argv == '-' && (*argv)[1] == 'd') { debug = 1; --argc; ++argv; }
-	if (argc < 1) { printf("usage: c5 [-s] [-d] file file...\n"); return -1; }
-
 	// Allocate processes
 	proc_max = 32;
 	proc_count = 0;
 	if (!(processes = (int*)malloc(proc_max * sizeof(int)))) { printf("Failed to allocate processes area\n"); }
 	memset(processes, 0, proc_max * sizeof(int));
 
-	// How many processes to start?
-	copies = 1;
-	while(copies > 0) {
-		if ((fd = open(*argv, 0)) < 0) { printf("could not open(%s)\n", *argv); return -1; }
+	--argc; ++argv;
+	if (argc > 0 && **argv == '-' && (*argv)[1] == 's') { src = 1; --argc; ++argv; }
+	if (argc > 0 && **argv == '-' && (*argv)[1] == 'd') { debug = 1; --argc; ++argv; }
+	while (argc > 0 && **argv == '-' && (*argv)[1] == 'r') {
+		--argc; ++argv;
+		processes[proc_count++] = (int)*argv;
+		--argc; ++argv;
+	}
+	if (argc < 1) { printf("usage: c5 [-s] [-d] [-r file] file args...\n"); return -1; }
+	processes[proc_count++] = (int)*argv;
+
+	// Start all processes
+	i = 0;
+	while(i < proc_count) {
+		tmp = (char*)processes[i];
+		if ((fd = open(tmp, 0)) < 0) { printf("could not open(%s)\n", tmp); return -1; }
 		srcsize = fdsize(fd) + 1;
 
 		if (!(p = pp = malloc(srcsize))) { printf("could not malloc(%d) source area\n", srcsize); return -1; }
-		if ((i = read(fd, p, srcsize)) <= 0) { printf("read() returned %d\n", i); return -1; }
-		p[i] = 0;
+		if ((ii = read(fd, p, srcsize)) <= 0) { printf("read() returned %d\n", i); return -1; }
+		p[ii] = 0;
 		close(fd);
 		process = create_process(p, argc, argv);
 		free((void*)pp);
 		if(process == 0) { printf("Invalid process\n"); return -1; }
-		processes[proc_count++] = (int)process;
-		--copies;
+		processes[i++] = (int)process;
 	}
 
 	// run...
