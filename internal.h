@@ -26,6 +26,9 @@ NUMTYPE c_atom_false();
 NUMTYPE c_atom_true();
 NUMTYPE c_atom_nil();
 
+NUMTYPE c_free_cell(NUMTYPE _cell);
+NUMTYPE c_free_env(NUMTYPE _env);
+
 NUMTYPE c_environment(NUMTYPE _outer);
 NUMTYPE c_env_get(const char *_name, NUMTYPE _env);
 NUMTYPE c_env_has(const char *_name, NUMTYPE _env);

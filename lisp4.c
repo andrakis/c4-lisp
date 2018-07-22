@@ -36,6 +36,8 @@ enum {
 	SYS2_LIST_EMPTY,// (int List) -> 1 | 0.
 	SYS2_LIST_SIZE, // (int List) -> int.
 	SYS2_ENV,       // (int Outer) -> int.
+	SYS2_FREE_CELL, // (int Cell) -> void. Free a cell object
+	SYS2_FREE_ENV,  // (int Env) -> void. Free an environment object
 	SYS2_ADD_GLOBS  // (int Env) -> void. Add global symbols to given env
 };
 // };
@@ -140,5 +142,8 @@ int main(int argc, char **argv)
 
 	printf("Has +: %d\n", env_has("+", global));
 	printf("Has foo: %d\n", env_has("foo", global));
+
+	printf("Cleaning up\n");
+	syscall2(SYS2_FREE_ENV, global);
 	return 0;
 }

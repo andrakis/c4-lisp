@@ -32,6 +32,8 @@ NUMTYPE syscall2(NUMTYPE signal, NUMTYPE arg1) {
 		case SYS2_LIST_EMPTY: return c_list_empty(arg1);
 		case SYS2_LIST_SIZE: return c_list_size(arg1);
 		case SYS2_ENV: return c_environment(arg1);
+		case SYS2_FREE_CELL: return c_free_cell(arg1);
+		case SYS2_FREE_ENV: return c_free_env(arg1);
 		case SYS2_ADD_GLOBS:
 			c_add_globals(arg1);
 			return 0; // void

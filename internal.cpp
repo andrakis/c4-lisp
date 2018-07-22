@@ -38,7 +38,9 @@ struct cell {
 	cell(proc_type proc) : type(Proc), proc(proc), env(0) {}
 };
 
-NUMTYPE c_cell_new(NUMTYPE tag, const char *value) { return (NUMTYPE)new cell((cell_type)tag, std::string(value)); }
+NUMTYPE c_cell_new(NUMTYPE tag, const char *value) {
+	return (NUMTYPE)new cell((cell_type)tag, std::string(value));
+}
 NUMTYPE c_cell_copy(NUMTYPE _cell) {
 	cell *c = (cell*)_cell;
 	cell *n = new cell(*c);
@@ -54,6 +56,12 @@ NUMTYPE c_cell_env_set(NUMTYPE _env, NUMTYPE _cell) {
 	cell *c = (cell*)_cell;
 	c->env = env;
 	return (NUMTYPE)env;
+}
+
+NUMTYPE c_free_cell(NUMTYPE _cell) {
+	cell *c = (cell*)_cell;
+	delete(c);
+	return 0;
 }
 
 NUMTYPE c_call_proc(NUMTYPE _cell, NUMTYPE _args) {
@@ -138,6 +146,11 @@ NUMTYPE c_environment(NUMTYPE _outer) {
 	environment *outer = (environment*) ((_outer != 0) ? _outer : 0);
 	environment *env   = new environment(outer);
 	return (NUMTYPE)env;
+}
+
+NUMTYPE c_free_env(NUMTYPE _env) {
+	environment *env = (environment*)_env;
+	delete(env);
 }
 
 NUMTYPE c_env_has(const char *_name, NUMTYPE _env) {
