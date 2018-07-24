@@ -1,9 +1,10 @@
 #include <iostream>
+#include <list>
+#include <map>
+#include <memory>
 #include <sstream>
 #include <string>
 #include <vector>
-#include <list>
-#include <map>
 
 #include "native.h"
 #include "internal.h"
@@ -21,6 +22,7 @@ NUMTYPE c_isdig(char c) { return isdig(c); }
 enum cell_type { Symbol, Number, List, Proc, Lambda };
 
 struct environment; // forward declaration; cell and environment reference each other
+typedef std::shared_ptr<environment> env_p;
 
 struct cell;
 
@@ -32,7 +34,11 @@ struct cell {
 	typedef cell(*proc_type)(const std::vector<cell> &);
 	typedef std::vector<cell>::const_iterator iter;
 	typedef std::map<std::string, cell> map;
-	cell_type type; std::string val; std::vector<cell> list; proc_type proc; environment * env;
+	cell_type type;
+	std::string val;
+	std::vector<cell> list;
+	proc_type proc;
+	env_p env;
 	cell(cell_type type = Symbol) : type(type), env(0) {}
 	cell(cell_type type, const std::string & val) : type(type), val(val), env(0) {}
 	cell(proc_type proc) : type(Proc), proc(proc), env(0) {}
@@ -48,13 +54,13 @@ NUMTYPE c_cell_copy(NUMTYPE _cell) {
 }
 NUMTYPE c_cell_env_get(NUMTYPE _cell) {
 	cell *c = (cell*)_cell;
-	environment *e = c->env;
+	env_p *e = &c->env;
 	return (NUMTYPE)e;
 }
 NUMTYPE c_cell_env_set(NUMTYPE _env, NUMTYPE _cell) {
-	environment *env = (environment*)_env;
+	env_p *env = (env_p*)_env;
 	cell *c = (cell*)_cell;
-	c->env = env;
+	c->env.swap(*env);
 	return (NUMTYPE)env;
 }
 
@@ -99,9 +105,9 @@ NUMTYPE c_atom_nil() { return (NUMTYPE)&nil; }
 // a dictionary that (a) associates symbols with cells, and
 // (b) can chain to an "outer" dictionary
 struct environment {
-	environment(environment * outer = 0) : outer_(outer) {}
+	environment(env_p outer = 0) : outer_(outer) {}
 
-	environment(const cells & parms, const cells & args, environment * outer)
+	environment(const cells & parms, const cells & args, env_p outer)
 		: outer_(outer)
 	{
 		cellit a = args.begin();
@@ -139,33 +145,34 @@ struct environment {
 
 private:
 	map env_; // inner symbol->cell mapping
-	environment * outer_; // next adjacent outer env, or 0 if there are no further environments
+	env_p outer_; // next adjacent outer env, or 0 if there are no further environments
 };
 
 NUMTYPE c_environment(NUMTYPE _outer) {
-	environment *outer = (environment*) ((_outer != 0) ? _outer : 0);
-	environment *env   = new environment(outer);
-	return (NUMTYPE)env;
+	env_p *outer = (env_p*)_outer;
+	environment *env   = (outer != 0 ? new environment(*outer) : new environment());
+	env_p *p = new env_p(env);
+	return (NUMTYPE)p;
 }
 
 NUMTYPE c_free_env(NUMTYPE _env) {
-	environment *env = (environment*)_env;
+	env_p *env = (env_p*)_env;
 	delete(env);
 }
 
 NUMTYPE c_env_has(const char *_name, NUMTYPE _env) {
 	std::string name(_name);
-	environment *env = (environment*)_env;
-	bool has = env->has(name);
+	env_p *env = (env_p*)_env;
+	bool has = env->get()->has(name);
 
 	return has ? 1 : 0;
 }
 
 NUMTYPE c_env_get(const char *_name, NUMTYPE _env) {
 	std::string name(_name);
-	environment *env = (environment*)_env;
-	if(env->has(name)) {
-		cell *found = &env->find(name)[name];
+	env_p *env = (env_p*)_env;
+	if(env->get()->has(name)) {
+		cell *found = &env->get()->find(name)[name];
 		return (NUMTYPE)found;
 	}
 
@@ -175,7 +182,8 @@ NUMTYPE c_env_get(const char *_name, NUMTYPE _env) {
 // return (*env)[x.list[1].val] = eval(x.list[2], env);
 NUMTYPE c_env_set(const char *_name, NUMTYPE _value, NUMTYPE _env) {
 	std::string name(_name);
-	environment *env = (environment*)_env;
+	env_p *ep = (env_p*)_env;
+	environment *env = ep->get();
 	cell *value = (cell*)_value;
 
 	(*env)[name] = *value;
@@ -288,8 +296,8 @@ void add_globals(environment & env)
 }
 
 NUMTYPE c_add_globals(NUMTYPE _env) {
-	environment *env = (environment*)_env;
-	add_globals(*env);
+	env_p *env = (env_p*)_env;
+	add_globals(*env->get());
 	return (NUMTYPE)env;
 }
 
@@ -347,6 +355,7 @@ NUMTYPE c_list_push_back(NUMTYPE _cell, NUMTYPE _list) {
 
 cell eval(cell x, environment * env)
 {
+#if false
 	if (x.type == Symbol)
 		return env->find(x.val)[x.val];
 	if (x.type == Number)
@@ -394,8 +403,10 @@ cell eval(cell x, environment * env)
 	else if (proc.type == Proc)
 		return proc.proc(exps);
 
+#else
 	std::cout << "not a function\n";
 	exit(1);
+#endif
 }
 
 
