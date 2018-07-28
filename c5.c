@@ -17,7 +17,8 @@
 #include "extras.h"
 
 char *p, *lp, // current position in source code
-     *data;   // data/bss pointer
+     *data,   // data/bss pointer
+     *opcodes;// opcodes string
 
 int *e, *le,  // current position in emitted code
     *id,      // currently parsed identifier
@@ -41,14 +42,42 @@ enum {
 enum {
 	LEA ,IMM ,JMP ,JSR ,BZ  ,BNZ ,ENT ,ADJ ,LEV ,LI  ,LC  ,SI  ,SC  ,PSH ,
 	OR  ,XOR ,AND ,EQ  ,NE  ,LT  ,GT  ,LE  ,GE  ,SHL ,SHR ,ADD ,SUB ,MUL ,DIV ,MOD ,
-	OPEN,READ,CLOS,PRTF,MALC,FREE,MSET,MCMP,EXIT,
+	OPEN,READ,CLOS,PRTF,MALC,FREE,MSET,MCMP,EXIT,FDSZ,
 	// Our syscalls
-	SYS1,SYS2,SYS3,SYS4,
-	// Extras
-	FDSZ,
+	SYS1,SYS2,SYS3,SYS4,SYSI,
 	// Pointer to last element
 	_SYMS
 };
+
+// Sets up the static data containing opcodes (for source output)
+void setup_opcodes() {
+	// Must be in same order as instructions enum
+	opcodes =
+		// VM primitives
+		"LEA ,IMM ,JMP ,JSR ,BZ  ,BNZ ,ENT ,ADJ ,LEV ,LI  ,LC  ,SI  ,"
+		"SC  ,PSH ,OR  ,XOR ,AND ,EQ  ,NE  ,LT  ,GT  ,LE  ,GE  ,SHL ,"
+		"SHR ,ADD ,SUB ,MUL ,DIV ,MOD ,"
+		// C functions
+		"OPEN,READ,CLOS,PRTF,MALC,FREE,MSET,MCMP,EXIT,FDSZ,"
+		// Syscalls
+		"SYS1,SYS2,SYS3,SYS4,SYSI";
+}
+
+// Sets up the static data containing keywords and imported functions.
+void setup_symbols() {
+	// Must match sequence of instructions enum
+	p = 
+		// Keywords
+		"char else enum if int return sizeof while "
+		// C functions
+		"open read close printf malloc free memset memcmp exit fdsize "
+		// Syscalls
+		"syscall1 syscall2 syscall3 syscall4 syscall_init "
+		// void data type
+		"void "
+		// main
+		"main";
+}
 
 // types
 enum { CHAR, INT, PTR };
@@ -81,9 +110,7 @@ void next()
 				printf("%d: %.*s", line, p - lp, lp);
 				lp = p;
 				while (le < e) {
-					printf("%8.4s", &"LEA ,IMM ,JMP ,JSR ,BZ  ,BNZ ,ENT ,ADJ ,LEV ,LI  ,LC  ,SI  ,SC  ,PSH ,"
-					        "OR  ,XOR ,AND ,EQ  ,NE  ,LT  ,GT  ,LE  ,GE  ,SHL ,SHR ,ADD ,SUB ,MUL ,DIV ,MOD ,"
-					        "OPEN,READ,CLOS,PRTF,MALC,FREE,MSET,MCMP,EXIT,SYS1,SYS2,SYS3,SYS4,FDSZ"[*++le * 5]);
+					printf("%8.4s", &opcodes[*++le * 5]);
 					if (*le <= ADJ) printf(" %d\n", *++le); else printf("\n");
 				}
 			}
@@ -390,11 +417,7 @@ int run_cycle(int *process, int cycles) {
 	while(cycles > 0) {
 		i = *pc++; ++cycle; --cycles;
 		if (debug) {
-		  // Must match sequence of enum
-		  printf("%d> %.4s", cycle,
-			&"LEA ,IMM ,JMP ,JSR ,BZ  ,BNZ ,ENT ,ADJ ,LEV ,LI  ,LC  ,SI  ,SC  ,PSH ,"
-			 "OR  ,XOR ,AND ,EQ  ,NE  ,LT  ,GT  ,LE  ,GE  ,SHL ,SHR ,ADD ,SUB ,MUL ,DIV ,MOD ,"
-			 "OPEN,READ,CLOS,PRTF,MALC,FREE,MSET,MCMP,EXIT,SYS1,SYS2,SYS3,SYS4,FDSZ"[i * 5]);
+		  printf("%d> %.4s", cycle, &opcodes[i * 5]);
 		  if (i <= ADJ) printf(" %d\n", *pc); else printf("\n");
 		}
 		if      (i == LEA) a = (int)(bp + *pc++);                             // load local address
@@ -438,14 +461,16 @@ int run_cycle(int *process, int cycles) {
 		else if (i == MSET) a = (int)memset((char *)sp[2], sp[1], *sp);
 		else if (i == MCMP) a = memcmp((char *)sp[2], (char *)sp[1], *sp);
 		else if (i == EXIT) {
-			printf("exit(%d) cycle = %d\n", *sp, cycle);
+			if(verbose) printf("exit(%d) cycle = %d\n", *sp, cycle);
 			process[B_halted] = 1;
 			process[B_exitcode] = *sp;
 			cycles = 0; 
-		} else if (i == SYS1) { t = sp + pc[1]; a = (int)syscall1(t[-1]); }
+		}
+		else if (i == SYS1) { t = sp + pc[1]; a = (int)syscall1(t[-1]); }
 		else if (i == SYS2) { t = sp + pc[1]; a = (int)syscall2(t[-1], t[-2]); }
 		else if (i == SYS3) { t = sp + pc[1]; a = (int)syscall3(t[-1], t[-2], t[-3]); }
 		else if (i == SYS4) { t = sp + pc[1]; a = (int)syscall4(t[-1], t[-2], t[-3], t[-4]); }
+		else if (i == SYSI) { t = sp + pc[1]; a = (int)syscall_init(t[-1], t[-2]); }
 		else if (i == FDSZ) { t = sp + pc[1]; a = fdsize(t[-1]); }
 		else { printf("unknown instruction = %d! cycle = %d\n", i, cycle); return -1; }
 	}
@@ -483,9 +508,8 @@ int *create_process(char *source, int argc, char **argv) {
 	memset(e,    0, poolsz);
 	memset(data, 0, poolsz);
 
-	// Must match sequence of enum
-	p = "char else enum if int return sizeof while "
-		"open read close printf malloc free memset memcmp exit syscall1 syscall2 syscall3 syscall4 fdsize void main";
+	setup_symbols();
+
 	i = Char; while (i <= While) { next(); id[Tk] = i++; } // add keywords to symbol table
 	i = OPEN; while (i < _SYMS) { next(); id[Class] = Sys; id[Type] = INT; id[Val] = i++; } // add library to symbol table
 	next(); id[Tk] = Char; // handle void type
@@ -622,22 +646,22 @@ void free_process(int *process) {
 
 	free((void*)process[B_p_sym]);
 	free((void*)process[B_p_e]);
-	free((void*)process[B_p_data]);
 	free((void*)process[B_p_sp]);
-	process[B_magic] = 0;
+	free((void*)process[B_p_data]);
 	free((void*)process);
 }
 
 int main(int argc, char **argv)
 {
 	int fd;
-	int *processes, *process, proc_max, proc_count, copies;
+	int *processes, *process, proc_max, proc_count;
 	char *pp, *tmp;
 	int i, ii, srcsize, cycle_count;
 
 	cycle_count = 1000;
 
 	// Set globals
+	setup_opcodes();
 	sym = le = e = 0;
 	data = 0;
 	B_MAGIC = 0xBEEF;
@@ -645,7 +669,7 @@ int main(int argc, char **argv)
 	// Allocate processes
 	proc_max = 32;
 	proc_count = 0;
-	if (!(processes = (int*)malloc(proc_max * sizeof(int)))) { printf("Failed to allocate processes area\n"); }
+	if (!(processes = (int*)malloc(proc_max * sizeof(int)))) { printf("Failed to allocate processes area\n"); return -1; }
 	memset(processes, 0, proc_max * sizeof(int));
 
 	--argc; ++argv;

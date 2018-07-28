@@ -67,3 +67,13 @@ NUMTYPE syscall4(NUMTYPE signal, NUMTYPE arg1, NUMTYPE arg2, NUMTYPE arg3) {
 			exit(-1);
 	}
 }
+
+NUMTYPE syscall_init(NUMTYPE section, NUMTYPE endmarker) {
+	switch(section) {
+		case 1: return endmarker == _SYS1_END;
+		case 2: return endmarker == _SYS2_END;
+		case 3: return endmarker == _SYS3_END;
+		case 4: return endmarker == _SYS4_END;
+		default: return 0;
+	}
+}

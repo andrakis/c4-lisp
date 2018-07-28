@@ -10,6 +10,7 @@ extern "C" {
 	NUMTYPE syscall2(NUMTYPE, NUMTYPE);
 	NUMTYPE syscall3(NUMTYPE, NUMTYPE, NUMTYPE);
 	NUMTYPE syscall4(NUMTYPE, NUMTYPE, NUMTYPE, NUMTYPE);
+	NUMTYPE syscall_init(NUMTYPE section, NUMTYPE endmarker);
 
 #ifdef __cplusplus
 }
@@ -22,7 +23,8 @@ extern "C" {
 enum {
 	SYS1_ATOM_FALSE, // void -> int. get pointer to false atom
 	SYS1_ATOM_TRUE, // void -> int. get pointer to true atom
-	SYS1_ATOM_NIL  // void -> int. get pointer to nil atom
+	SYS1_ATOM_NIL, // void -> int. get pointer to nil atom
+	_SYS1_END        // Must be last element
 };
 // };
 
@@ -41,7 +43,8 @@ enum {
 	SYS2_ENV,       // (int Outer) -> int.
 	SYS2_FREE_CELL, // (int Cell) -> void. Free a cell object
 	SYS2_FREE_ENV,  // (int Env) -> void. Free an environment object
-	SYS2_ADD_GLOBS  // (int Env) -> void. Add global symbols to given env
+	SYS2_ADD_GLOBS, // (int Env) -> void. Add global symbols to given env
+	_SYS2_END       // Must be last element
 };
 // };
 
@@ -49,20 +52,23 @@ enum {
 // syscalls that take 2 arguments (the signal, 2 args)
 enum {
 	SYS3_CELL_NEW,    // (int Tag, char *Value) -> int.
+	SYS3_CELL_RESET,  // (int Dest, int Source) -> void. Reset cell value to Source values
 	SYS3_CELL_STRCMP, // (char *s, int Cell) -> 0 | 1. Returns 0 on match, like strmp
 	SYS3_CELL_ENV_SET,// (int Env, int Cell) -> void.
 	SYS3_LIST_INDEX,  // (int Index, int List) -> int.Cell.
 	SYS3_LIST_PUSHB,  // (int Cell, int List) -> List.
 	SYS3_ENV_GET,     // (char *Name, int Env) -> int.Cell.
 	SYS3_ENV_HAS,     // (char *Name, int Env) -> 0 | 1.
-	SYS3_CALL_PROC    // (int Cell, int Cells::Args) -> int.Cell.
+	SYS3_CALL_PROC,   // (int Cell, int Cells::Args) -> int.Cell.
+	_SYS3_END         // Must be last element
 };
 // };
 
 // enum Syscalls4 {
 // syscalls that take 3 arguments (the signal, 3 args)
 enum {
-	SYS4_ENV_SET      // (char *Name, int Cell, int Env) -> Env.
+	SYS4_ENV_SET,     // (char *Name, int Cell, int Env) -> Env.
+	_SYS4_END         // Must be last element
 };
 // };
 

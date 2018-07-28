@@ -42,10 +42,24 @@ struct cell {
 	cell(cell_type type = Symbol) : type(type), env(0) {}
 	cell(cell_type type, const std::string & val) : type(type), val(val), env(0) {}
 	cell(proc_type proc) : type(Proc), proc(proc), env(0) {}
+	void reset(const cell &c) {
+		type = c.type;
+		val = c.val;
+		list = c.list;
+		env = c.env;
+	}
 };
 
 NUMTYPE c_cell_new(NUMTYPE tag, const char *value) {
 	return (NUMTYPE)new cell((cell_type)tag, std::string(value));
+}
+
+// Reset (copy) values from another cell
+NUMTYPE c_cell_reset(NUMTYPE dest, NUMTYPE source) {
+	cell *d = (cell*)dest;
+	cell *s = (cell*)source;
+	d->reset(*s);
+	return (NUMTYPE)dest;
 }
 NUMTYPE c_cell_copy(NUMTYPE _cell) {
 	cell *c = (cell*)_cell;
