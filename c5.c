@@ -29,7 +29,8 @@ int *e, *le,  // current position in emitted code
     loc,      // local variable offset
     line,     // current line number
     src,      // print source and assembly flag
-    debug;    // print executed instructions
+    debug,    // print executed instructions
+    verbose;  // print more detailed info
 
 // tokens and classes (operators last and in precedence order)
 enum {
@@ -297,21 +298,21 @@ void expr(int lev)
 			*d = (int)(e + 1);
 		}
 		else if (tk == Lor) { next(); *++e = BNZ; d = ++e; expr(Lan); *d = (int)(e + 1); ty = INT; }
-		else if (tk == Lan) { next(); *++e = BZ;	d = ++e; expr(Or);	*d = (int)(e + 1); ty = INT; }
-		else if (tk == Or)	{ next(); *++e = PSH; expr(Xor); *++e = OR;	ty = INT; }
+		else if (tk == Lan) { next(); *++e = BZ;  d = ++e; expr(Or);  *d = (int)(e + 1); ty = INT; }
+		else if (tk == Or)  { next(); *++e = PSH; expr(Xor); *++e = OR;  ty = INT; }
 		else if (tk == Xor) { next(); *++e = PSH; expr(And); *++e = XOR; ty = INT; }
-		else if (tk == And) { next(); *++e = PSH; expr(Eq);	*++e = AND; ty = INT; }
-		else if (tk == Eq)	{ next(); *++e = PSH; expr(Lt);	*++e = EQ;	ty = INT; }
-		else if (tk == Ne)	{ next(); *++e = PSH; expr(Lt);	*++e = NE;	ty = INT; }
-		else if (tk == Lt)	{ next(); *++e = PSH; expr(Shl); *++e = LT;	ty = INT; }
-		else if (tk == Gt)	{ next(); *++e = PSH; expr(Shl); *++e = GT;	ty = INT; }
-		else if (tk == Le)	{ next(); *++e = PSH; expr(Shl); *++e = LE;	ty = INT; }
-		else if (tk == Ge)	{ next(); *++e = PSH; expr(Shl); *++e = GE;	ty = INT; }
+		else if (tk == And) { next(); *++e = PSH; expr(Eq);  *++e = AND; ty = INT; }
+		else if (tk == Eq)  { next(); *++e = PSH; expr(Lt);  *++e = EQ;  ty = INT; }
+		else if (tk == Ne)  { next(); *++e = PSH; expr(Lt);  *++e = NE;  ty = INT; }
+		else if (tk == Lt)  { next(); *++e = PSH; expr(Shl); *++e = LT;  ty = INT; }
+		else if (tk == Gt)  { next(); *++e = PSH; expr(Shl); *++e = GT;  ty = INT; }
+		else if (tk == Le)  { next(); *++e = PSH; expr(Shl); *++e = LE;  ty = INT; }
+		else if (tk == Ge)  { next(); *++e = PSH; expr(Shl); *++e = GE;  ty = INT; }
 		else if (tk == Shl) { next(); *++e = PSH; expr(Add); *++e = SHL; ty = INT; }
 		else if (tk == Shr) { next(); *++e = PSH; expr(Add); *++e = SHR; ty = INT; }
 		else if (tk == Add) {
 			next(); *++e = PSH; expr(Mul);
-			if ((ty = t) > PTR) { *++e = PSH; *++e = IMM; *++e = sizeof(int); *++e = MUL;	}
+			if ((ty = t) > PTR) { *++e = PSH; *++e = IMM; *++e = sizeof(int); *++e = MUL; }
 			*++e = ADD;
 		}
 		else if (tk == Sub) {
@@ -623,6 +624,15 @@ int *create_process(char *source, int argc, char **argv) {
 	*--sp = (int)argv;
 	*--sp = (int)t;
 
+	free((void*)process[B_p_sym]);
+
+	if(verbose) {
+		printf("Process image information:\n");
+		printf("  Emitted code size: %d\n", (int)(e - process[B_p_e]));
+		printf("  Emitted data size: %d\n", (int)(data - process[B_p_data]));
+		printf("  Main entry point: %d\n", (int)pc);
+	}
+
 	process[B_magic] = B_MAGIC;
 	process[B_exitcode] = 0;
 	process[B_sym] = (int)sym;
@@ -644,7 +654,7 @@ void free_process(int *process) {
 		return;
 	}
 
-	free((void*)process[B_p_sym]);
+	process[B_magic] = 0;
 	free((void*)process[B_p_e]);
 	free((void*)process[B_p_sp]);
 	free((void*)process[B_p_data]);
@@ -665,6 +675,7 @@ int main(int argc, char **argv)
 	sym = le = e = 0;
 	data = 0;
 	B_MAGIC = 0xBEEF;
+	verbose = 0;
 
 	// Allocate processes
 	proc_max = 32;
@@ -673,21 +684,50 @@ int main(int argc, char **argv)
 	memset(processes, 0, proc_max * sizeof(int));
 
 	--argc; ++argv;
-	if (argc > 0 && **argv == '-' && (*argv)[1] == 's') { src = 1; --argc; ++argv; }
-	if (argc > 0 && **argv == '-' && (*argv)[1] == 'd') { debug = 1; --argc; ++argv; }
-	while (argc > 0 && **argv == '-' && (*argv)[1] == 'r') {
-		--argc; ++argv;
-		processes[proc_count++] = (int)*argv;
+	i = 0; // when to exit parameter parsing
+	while(argc > 0 && **argv == '-' && i == 0) {
+		// -s      show source and exit
+		if ((*argv)[1] == 's') { src = 1; }
+		// -d      show source during execution
+		else if ((*argv)[1] == 'd') { debug = 1; }
+		// -c 123  set cycle count to 123
+		else if ((*argv)[1] == 'c') {
+			--argc; ++argv;
+			// inline atoi
+			cycle_count = 0;
+			pp = *argv;
+			while(*pp != 0) {
+				cycle_count = cycle_count * 10 + (*pp++ - '0');
+			}
+			printf("Cycle count set to %i\n", cycle_count);
+		}
+		// -r xyz  start additional process
+		else if((*argv)[1] == 'r') {
+			--argc; ++argv;
+			processes[proc_count++] = (int)*argv;
+			--argc; ++argv;
+		}
+		// -v      enable verbose mode
+		else if((*argv)[1] == 'v') { verbose = 1; }
+		// --      end parameter passing
+		else if((*argv)[1] == '-') { i = 1; }
+		else {
+			printf("Invalid argument: %s\n", *argv);
+			free(processes);
+			return -1;
+		}
 		--argc; ++argv;
 	}
-	if (argc < 1) { printf("usage: c5 [-s] [-d] [-r file] file args...\n"); return -1; }
+	if (argc < 1) { free(processes); printf("usage: c5 [-s] [-d] [-v] [-c nnn] [-r file] file args...\n"); return -1; }
 	processes[proc_count++] = (int)*argv;
 
 	// Start all processes
 	i = 0;
 	while(i < proc_count) {
 		tmp = (char*)processes[i];
-		if ((fd = open(tmp, 0)) < 0) { printf("could not open(%s)\n", tmp); return -1; }
+		if ((fd = open(tmp, 0)) < 0) {
+			printf("could not open(%s), ensure options are before filename\n", tmp); return -1;
+		}
 		srcsize = fdsize(fd) + 1;
 
 		if (!(p = pp = malloc(srcsize))) { printf("could not malloc(%d) source area\n", srcsize); return -1; }
