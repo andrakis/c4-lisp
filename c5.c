@@ -467,13 +467,18 @@ int run_cycle(int *process, int cycles) {
 			process[B_exitcode] = *sp;
 			cycles = 0; 
 		}
-		else if (i == SYS1) { t = sp + pc[1]; a = (int)syscall1(t[-1]); }
-		else if (i == SYS2) { t = sp + pc[1]; a = (int)syscall2(t[-1], t[-2]); }
-		else if (i == SYS3) { t = sp + pc[1]; a = (int)syscall3(t[-1], t[-2], t[-3]); }
-		else if (i == SYS4) { t = sp + pc[1]; a = (int)syscall4(t[-1], t[-2], t[-3], t[-4]); }
-		else if (i == SYSI) { t = sp + pc[1]; a = (int)syscall_init(t[-1], t[-2]); }
-		else if (i == FDSZ) { t = sp + pc[1]; a = fdsize(t[-1]); }
-		else { printf("unknown instruction = %d! cycle = %d\n", i, cycle); return -1; }
+		else if (i == SYS1) { a = (int)syscall1(*sp); }
+		else if (i == SYS2) { a = (int)syscall2(sp[1], *sp); }
+		else if (i == SYS3) { a = (int)syscall3(sp[2], sp[1], *sp); }
+		else if (i == SYS4) { a = (int)syscall4(sp[3], sp[2], sp[1], *sp); }
+		else if (i == SYSI) { a = (int)syscall_init(sp[1], *sp); }
+		else if (i == FDSZ) { a = fdsize(*sp); }
+		else {
+			printf("unknown instruction = %d! cycle = %d\n", i, cycle);
+			process[B_halted] = 1;
+			process[B_exitcode] = -1;
+			cycles = 0; 
+		}
 	}
 
 	// Save process state
