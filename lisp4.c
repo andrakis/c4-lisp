@@ -1,4 +1,3 @@
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <memory.h>
@@ -76,8 +75,97 @@ char *sym_quote,
      *sym_lambda,
      *sym_begin;
 
-int cell_strcmp(char *str, int cell) {
-	return syscall3(SYS3_CELL_STRCMP, (int)(int*)str, cell);
+// Wrappers around various syscalls
+int cell_strcmp(char *str, void *cell) {
+	return syscall3(SYS3_CELL_STRCMP, (void*)str, cell);
+}
+
+void *list_new() {
+	return (void*)syscall2(SYS2_LIST, 0);
+}
+
+void list_free(void *list) {
+	syscall2(SYS2_LIST_FREE, list);
+}
+
+void *list_push_back(void *element, int *list) {
+	return (void*)syscall3(SYS3_LIST_PUSHB, element, list);
+}
+
+void *list_front(int *list) {
+	return (int*)syscall2(SYS2_LIST_FRONT, list);
+}
+
+void *list_pop_front(void *list) {
+	return (void*)syscall2(SYS2_LIST_POPF, list);
+}
+
+void *tokenise(char *s) { // -> list()
+	void *tokens;
+	char *t;
+
+	tokens = list_new();
+
+	while(*s) {
+		while(*s == ' ') ++s;
+		if(*s == '(' || *s == ')')
+			list_push_back(*s++ == '(' ? "(" : ")", tokens);
+		else {
+			t = s;
+			while(*t && *t != ' ' && *t != '(' && *t != ')')
+				++t;
+			list_push_back_range(s, t, tokens);
+			s = t;
+		}
+	}
+
+	return tokens;
+}
+
+void *atom(void *token /* cell */) { // cell *
+	char *t;
+	void *c;
+
+	t = cell_str(token);
+	if(isdig(t[0]) || (t[0] == '-' && isdig(t[1]))) {
+		c = cell_new_number(t);
+	} else {
+		c = cell_new_str(t);
+	}
+
+	str_free(t);
+	return c;
+}
+
+void *read_from(void *tokens /* list(str) */) { // -> cell()
+	void *token, *c, *t; // cell *token, *c, *t;
+
+	token = list_front(tokens);
+	tokens = list_pop_front(tokens);
+	if(cell_strcmp("(", token) == 0) {
+		c = list_new();
+		while(cell_strcmp(")", list_front(tokens)) != 0) {
+			tokens = list_push_back(read_from(tokens), c);
+		}
+		t = list_front(tokens);
+		tokens = list_pop_front(tokens);
+		cell_free(token); // clear token grabbed
+		cell_free(t); // clear token grabbed
+		return c;
+	} else {
+		t = atom(token);
+		cell_free(token); // clear token grabbed
+		return t;
+	}
+}
+
+void *read(char *s) { // -> cell*
+	void *tokens, *cell;
+
+	tokens = tokenise(s);
+	cell = read_from(tokens);
+	list_free(tokens);
+	return cell;
 }
 
 int eval_instruction(int list, int x, int env) {
@@ -124,13 +212,13 @@ int eval(int x, int env) {
 	}
 }
 
-int env_has(char *s, int env) {
-	return syscall3(SYS3_ENV_HAS, (int)(int*)s, env);
+int env_has(char *s, void *env) {
+	return syscall3(SYS3_ENV_HAS, (void*)s, env);
 }
 
 int main(int argc, char **argv)
 {
-	int global, tokens;
+	void *global, *tokens;
 	char *code;
 
 	// Ensure syscalls are up to date
