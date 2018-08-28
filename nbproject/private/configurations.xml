@@ -17,8 +17,7 @@
         </gdb_signals>
         <gdb_options>
           <DebugOptions>
-            <option name="debug_command"
-                    value="${OUTPUT_PATH} c5.c /home/daedalus/git/c4/fac.c"/>
+            <option name="debug_command" value="${OUTPUT_PATH} -L"/>
             <option name="debug_dir" value="/home/daedalus/NetBeansProjects/lisp4/."/>
           </DebugOptions>
         </gdb_options>

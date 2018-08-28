@@ -12,7 +12,7 @@
 #include <unistd.h>
 #include <fcntl.h>
 
-#include "native.h"
+#include "c5_native.h"
 #include "syscalls.h"
 #include "extras.h"
 
@@ -145,12 +145,12 @@ void next()
 			tk = Num;
 			return;
 		}
-		else if (tk == '/') {
+		else if (tk == '/') {            // C++ style comment: //
 			if (*p == '/') {
 				++p;
 				while (*p != 0 && *p != '\n') ++p;
 			}
-			else if (*p == '*') {
+			else if (*p == '*') {        // C style comment: /* */
 				++p;
 				t = 0;
 				while (*p != 0 && t == 0) {
@@ -206,14 +206,14 @@ void expr(int lev)
 	else if (tk == '"') {
 		*++e = IMM; *++e = ival; next();
 		while (tk == '"') next();
-		data = (char *)((int)data + sizeof(int) & -sizeof(int)); ty = PTR;
+		data = (char *)((int)data + sizeof(int*) & -sizeof(int*)); ty = PTR;
 	}
 	else if (tk == Sizeof) {
 		next(); if (tk == '(') next(); else { printf("%d: open paren expected in sizeof\n", line); exit(-1); }
 		ty = INT; if (tk == Int) next(); else if (tk == Char) { next(); ty = CHAR; }
 		while (tk == Mul) { next(); ty = ty + PTR; }
 		if (tk == ')') next(); else { printf("%d: close paren expected in sizeof\n", line); exit(-1); }
-		*++e = IMM; *++e = (ty == CHAR) ? sizeof(char) : sizeof(int);
+		*++e = IMM; *++e = (ty == CHAR) ? sizeof(char) : sizeof(int*);
 		ty = INT;
 	}
 	else if (tk == Id) {
@@ -275,7 +275,7 @@ void expr(int lev)
 		else if (*e == LI) { *e = PSH; *++e = LI; }
 		else { printf("%d: bad lvalue in pre-increment\n", line); exit(-1); }
 		*++e = PSH;
-		*++e = IMM; *++e = (ty > PTR) ? sizeof(int) : sizeof(char);
+		*++e = IMM; *++e = (ty > PTR) ? sizeof(int*) : sizeof(char);
 		*++e = (t == Inc) ? ADD : SUB;
 		*++e = (ty == CHAR) ? SC : SI;
 	}
@@ -312,13 +312,13 @@ void expr(int lev)
 		else if (tk == Shr) { next(); *++e = PSH; expr(Add); *++e = SHR; ty = INT; }
 		else if (tk == Add) {
 			next(); *++e = PSH; expr(Mul);
-			if ((ty = t) > PTR) { *++e = PSH; *++e = IMM; *++e = sizeof(int); *++e = MUL; }
+			if ((ty = t) > PTR) { *++e = PSH; *++e = IMM; *++e = sizeof(int*); *++e = MUL; }
 			*++e = ADD;
 		}
 		else if (tk == Sub) {
 			next(); *++e = PSH; expr(Mul);
-			if (t > PTR && t == ty) { *++e = SUB; *++e = PSH; *++e = IMM; *++e = sizeof(int); *++e = DIV; ty = INT; }
-			else if ((ty = t) > PTR) { *++e = PSH; *++e = IMM; *++e = sizeof(int); *++e = MUL; *++e = SUB; }
+			if (t > PTR && t == ty) { *++e = SUB; *++e = PSH; *++e = IMM; *++e = sizeof(int*); *++e = DIV; ty = INT; }
+			else if ((ty = t) > PTR) { *++e = PSH; *++e = IMM; *++e = sizeof(int*); *++e = MUL; *++e = SUB; }
 			else *++e = SUB;
 		}
 		else if (tk == Mul) { next(); *++e = PSH; expr(Inc); *++e = MUL; ty = INT; }
@@ -328,17 +328,17 @@ void expr(int lev)
 			if (*e == LC) { *e = PSH; *++e = LC; }
 			else if (*e == LI) { *e = PSH; *++e = LI; }
 			else { printf("%d: bad lvalue in post-increment\n", line); exit(-1); }
-			*++e = PSH; *++e = IMM; *++e = (ty > PTR) ? sizeof(int) : sizeof(char);
+			*++e = PSH; *++e = IMM; *++e = (ty > PTR) ? sizeof(int*) : sizeof(char);
 			*++e = (tk == Inc) ? ADD : SUB;
 			*++e = (ty == CHAR) ? SC : SI;
-			*++e = PSH; *++e = IMM; *++e = (ty > PTR) ? sizeof(int) : sizeof(char);
+			*++e = PSH; *++e = IMM; *++e = (ty > PTR) ? sizeof(int*) : sizeof(char);
 			*++e = (tk == Inc) ? SUB : ADD;
 			next();
 		}
 		else if (tk == Brak) {
 			next(); *++e = PSH; expr(Assign);
 			if (tk == ']') next(); else { printf("%d: close bracket expected\n", line); exit(-1); }
-			if (t > PTR) { *++e = PSH; *++e = IMM; *++e = sizeof(int); *++e = MUL;	}
+			if (t > PTR) { *++e = PSH; *++e = IMM; *++e = sizeof(int*); *++e = MUL;	}
 			else if (t < PTR) { printf("%d: pointer type expected\n", line); exit(-1); }
 			*++e = ADD;
 			*++e = ((ty = t - PTR) == CHAR) ? LC : LI;
@@ -397,7 +397,7 @@ void stmt()
 }
 
 int run_cycle(int *process, int cycles) {
-	int *pc, *sp, *bp, a, cycle; // vm registers
+	int *pc, *sp, *bp, a, cycle, max_cycle; // vm registers
 	int i, *t; // temps
 
 	if(process[B_magic] != B_MAGIC) {
@@ -414,13 +414,15 @@ int run_cycle(int *process, int cycles) {
 	bp    = (int*)process[B_bp];
 	a     = process[B_a];
 	cycle = process[B_cycle];
+    max_cycle = cycle + cycles;
 
-	while(cycles > 0) {
-		i = *pc++; ++cycle; --cycles;
+	while(++cycle <= max_cycle) {
+		i = *pc++;
 		if (debug) {
 		  printf("%d> %.4s", cycle, &opcodes[i * 5]);
 		  if (i <= ADJ) printf(" %d\n", *pc); else printf("\n");
 		}
+		// Basic VM operations
 		if      (i == LEA) a = (int)(bp + *pc++);                             // load local address
 		else if (i == IMM) a = *pc++;                                         // load global address or immediate
 		else if (i == JMP) pc = (int *)*pc;                                   // jump
@@ -435,7 +437,7 @@ int run_cycle(int *process, int cycles) {
 		else if (i == SI)  *(int *)*sp++ = a;                                 // store int
 		else if (i == SC)  a = *(char *)*sp++ = a;                            // store char
 		else if (i == PSH) *--sp = a;                                         // push
-
+        // Basic arithmatic operations
 		else if (i == OR)  a = *sp++ |  a;
 		else if (i == XOR) a = *sp++ ^  a;
 		else if (i == AND) a = *sp++ &  a;
@@ -452,7 +454,7 @@ int run_cycle(int *process, int cycles) {
 		else if (i == MUL) a = *sp++ *  a;
 		else if (i == DIV) a = *sp++ /  a;
 		else if (i == MOD) a = *sp++ %  a;
-
+        // C functions as VM operations
 		else if (i == OPEN) a = open((char *)sp[1], *sp);
 		else if (i == READ) a = read(sp[2], (char *)sp[1], *sp);
 		else if (i == CLOS) a = close(*sp);
@@ -465,7 +467,7 @@ int run_cycle(int *process, int cycles) {
 			if(verbose) printf("exit(%d) cycle = %d\n", *sp, cycle);
 			process[B_halted] = 1;
 			process[B_exitcode] = *sp;
-			cycles = 0; 
+			max_cycle = 0; 
 		}
 		else if (i == SYS1) { a = (int)syscall1(*sp); }
 		else if (i == SYS2) { a = (int)syscall2(sp[1], *sp); }
@@ -497,7 +499,7 @@ int *create_process(char *source, int argc, char **argv) {
 	int *process, *idmain, poolsz;
 	poolsz = 256*1024; // arbitrary size
 
-	if (!(process = (int*)malloc(__B * sizeof(int)))) { printf("Could not malloc(%d) process space\n", __B); return 0; }
+	if (!(process = (int*)malloc(__B * sizeof(int*)))) { printf("Could not malloc(%d) process space\n", __B); return 0; }
 
 	// Reset globals
 	if (!(sym = malloc(poolsz))) { printf("could not malloc(%d) symbol area\n", poolsz); return 0; }
@@ -612,7 +614,7 @@ int *create_process(char *source, int argc, char **argv) {
 			else {
 				id[Class] = Glo;
 				id[Val] = (int)data;
-				data = data + sizeof(int);
+				data = data + sizeof(int*);
 			}
 			if (tk == ',') next();
 		}
@@ -623,6 +625,19 @@ int *create_process(char *source, int argc, char **argv) {
 
 	// setup stack
 	bp = sp = (int *)((int)sp + poolsz);
+    // write stack values and small function to exit if main returns
+    //
+    //  [BOTTOM OF STACK]
+    //  $label0           // addr of return location, left on the
+    //                       stack so that the LEV instruction sets
+    //                       pc to the location of the PSH instruction.
+    //  // arguments to main
+    //  argv              //  char **argv
+    //  argc              //  int    argc
+    //  label0:           // return location, pc is set to this
+    //  PSH               // push value returned by main
+    //  EXIT              // and exit with it
+    //  [TOP OF STACK]
 	*--sp = EXIT; // call exit if main returns
 	*--sp = PSH; t = sp;
 	*--sp = argc;
@@ -635,7 +650,7 @@ int *create_process(char *source, int argc, char **argv) {
 		printf("Process image information:\n");
 		printf("  Emitted code size: %d\n", (int)(e - process[B_p_e]));
 		printf("  Emitted data size: %d\n", (int)(data - process[B_p_data]));
-		printf("  Main entry point: %d\n", (int)pc);
+		printf("  main() entry point: %d\n", (int)pc);
 	}
 
 	process[B_magic] = B_MAGIC;
@@ -666,12 +681,28 @@ void free_process(int *process) {
 	free((void*)process);
 }
 
+#if 0
+// Dummy value for when c5.c is run indirectly
+enum { SYS3_LISP_MAIN };
+#endif
+
+int c5_lispmain(int argc, char **argv) {
+#if 0
+	printf("Indirect call to c5_lispmain not supported\n");
+	return 1;
+#endif
+	return syscall3(SYS3_LISP_MAIN, argc, (int)argv);
+}
+
+// Override name when compiling natively
+#define main c5_main
 int main(int argc, char **argv)
 {
 	int fd;
 	int *processes, *process, proc_max, proc_count;
 	char *pp, *tmp;
-	int i, ii, srcsize, cycle_count;
+	int i, ii, srcsize, cycle_count, exitcode;
+	int enter_lispmain;
 
 	cycle_count = 1000;
 
@@ -682,11 +713,13 @@ int main(int argc, char **argv)
 	B_MAGIC = 0xBEEF;
 	verbose = 0;
 
+	enter_lispmain = 0;
+
 	// Allocate processes
 	proc_max = 32;
 	proc_count = 0;
-	if (!(processes = (int*)malloc(proc_max * sizeof(int)))) { printf("Failed to allocate processes area\n"); return -1; }
-	memset(processes, 0, proc_max * sizeof(int));
+	if (!(processes = (int*)malloc(proc_max * sizeof(int*)))) { printf("Failed to allocate processes area\n"); return -1; }
+	memset(processes, 0, proc_max * sizeof(int*));
 
 	--argc; ++argv;
 	i = 0; // when to exit parameter parsing
@@ -712,6 +745,13 @@ int main(int argc, char **argv)
 			processes[proc_count++] = (int)*argv;
 			--argc; ++argv;
 		}
+		// -L      enter lispmain
+		else if((*argv)[1] == 'L') {
+			free(processes);
+			--argc; ++argv;
+			free(processes);
+			return c5_lispmain(argc, argv);
+		}
 		// -v      enable verbose mode
 		else if((*argv)[1] == 'v') { verbose = 1; }
 		// --      end parameter passing
@@ -723,7 +763,7 @@ int main(int argc, char **argv)
 		}
 		--argc; ++argv;
 	}
-	if (argc < 1) { free(processes); printf("usage: c5 [-s] [-d] [-v] [-c nnn] [-r file] file args...\n"); return -1; }
+	if (argc < 1) { free(processes); printf("usage: c5 [-L] [-s] [-d] [-v] [-c nnn] [-r file] file args...\n"); return -1; }
 	processes[proc_count++] = (int)*argv;
 
 	// Start all processes
@@ -747,12 +787,14 @@ int main(int argc, char **argv)
 
 	// run...
 	i = 0;
+	exitcode = 0;
 	while(proc_count > 0) {
 		process = (int*)processes[i];
 		if(process) {
 			if(run_cycle(process, cycle_count) == 1) {
 				// Finished
 				printf("Proc %d finished: %d\n", i, process[B_exitcode]);
+				exitcode = process[B_exitcode];
 				free_process(process);
 				processes[i] = 0;
 				--proc_count;
@@ -764,5 +806,5 @@ int main(int argc, char **argv)
 
 	free((void*)processes);
 
-	return 0;
+	return exitcode;
 }

@@ -1,0 +1,153 @@
+#!/bin/bash
+set -e
+#set -x
+set -T
+ARGV0=$0
+DEFAULT_TARGET=lisp4.c
+PRE=""
+INDENT="    "
+RUN_DIRECT=1
+RUN_INDIRECT=1
+RUN_TIME=0
+INDIRECT_TARGET="c5.c"
+RUN_CONTINUE_ON_ERROR=0
+RUN_DEBUG=1
+ARGS_PRE=""
+BIN_DEBUG="bin/debug"
+BIN_RELEASE="bin/release"
+
+indent() { sed "s/^/$INDENT/"; }
+help() {
+	echo "Run the lisp4 interpreter with various options."
+	echo "Usage: $ARGV0 [-C] [-D] [-R] [-V] [-T] [-M] [-a ARGS] [-s INDENT_STRING] [-d] [-i] [target_file.c ...]"
+	echo ""
+	echo "Flags:"
+	echo "-C                 Continue on error (default: stop)." | indent
+	echo "-D                 Use debug build (default)." | indent
+	echo "-R                 Use release build." | indent
+	echo "-V                 Use valgrind." | indent
+	echo "-T                 Run through 'time'." | indent
+	echo "-M                 Run 'make' prior to execution." | indent
+	echo "-a ARGS            Pass ARGS to binary (before target file)." | indent
+	echo "-s INDENT_STRING   Use given INDENT_STRING as indentor for output." | indent
+	echo "-d                 Use direct mode only (binary run). Cancels -i." | indent
+	echo "-i                 Use indirect mode only (run through c5.c). Cancels -d." | indent
+	echo "target_file.c ...  File(s) to run (defaults to $DEFAULT_TARGET)." | indent
+	echo ""
+	exit
+}
+
+error_continuable() {
+	if [ "$RUN_CONTINUE_ON_ERROR" != "1" ]; then
+		exit $1
+	fi
+}
+
+error_fatal() {
+	exit -1
+}
+
+run_target() {
+	target="$PRE_ARGS$1"
+	bin="$BIN_DEBUG"
+
+	if [ "$RUN_DEBUG" == "0" ]; then
+		bin="$BIN_RELEASE"
+	fi
+
+	echo "Run target: $target"
+	run_target_direct $bin $target | indent
+	run_target_indirect $bin $target | indent
+}
+
+run_target_direct() {
+	if [ "$RUN_DIRECT" == "1" ]; then
+		echo "[- Direct mode -]"
+		run_target__with "$@" | indent
+	else
+		echo "[- Not running direct target. -]"
+	fi
+}
+
+run_target_indirect() {
+	first=$1
+	shift
+	if [ "$RUN_INDIRECT" == "1" ]; then
+		echo "[- Indirect mode -]"
+		run_target__with "$first" "$INDIRECT_TARGET" "$*" | indent
+	else
+		echo "[- Not running indirect target. -]"
+	fi
+}
+
+run_target__with() {
+	xx="$1"
+	if [ "$ARGS_PRE"x != "x" ]; then
+		xx="$xx $ARGS_PRE"
+	fi
+	shift
+	yy="$PRE $xx $*"
+	echo "Running '$yy'"
+	run_target__now "$yy" | indent
+}
+
+run_target__now() {
+	if [ "$RUN_TIME" == "1" ]; then
+		bash -c "time $yy" || error_continuable
+	else
+		$yy || error_continuable
+	fi
+}
+
+run_make() {
+	if [ "$RUN_DEBUG" == "1" ]; then
+		conf="Debug"
+	else
+		conf="Release"
+	fi
+	xx="make CONF=$conf"
+	echo "Running $xx"
+	$xx | indent
+}
+
+ran=0
+while test ${#} -gt 0; do
+	if [[ "$1" =~ ^--?he?l?p?$ ]]; then
+		help
+	elif [ "$1" == "-s" ]; then
+		shift
+		INDENT="$1"
+	elif [ "$1" == "-d" ]; then
+		RUN_DIRECT=1
+		RUN_INDIRECT=0
+	elif [ "$1" == "-i" ]; then
+		RUN_DIRECT=0
+		RUN_INDIRECT=1
+	elif [ "$1" == "-C" ]; then
+		RUN_CONTINUE_ON_ERROR=1
+		set +e
+	elif [ "$1" == "-V" ]; then
+		PRE=`which valgrind`
+	elif [ "$1" == "-a" ]; then
+		shift
+		ARGS_PRE="$1"
+	elif [ "$1" == "-M" ]; then
+		run_make
+	elif [ "$1" == "-D" ]; then
+		RUN_DEBUG=1
+		echo "-- Using Debug build"
+	elif [ "$1" == "-R" ]; then
+		RUN_DEBUG=0
+		echo "-- Using Release build"
+	elif [ "$1" == "-T" ]; then
+		RUN_TIME=1
+	elif [ "$1"x != "" ]; then
+		run_target $1
+		ran=1
+	fi
+	shift
+done
+
+if [ "$ran" == "0" ]; then
+	run_target $DEFAULT_TARGET
+fi

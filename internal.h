@@ -37,6 +37,14 @@ NUMTYPE c_env_set(const char *_name, NUMTYPE _value, NUMTYPE _env);
 NUMTYPE c_add_globals(NUMTYPE _env);
 NUMTYPE c_call_proc(NUMTYPE _cell, NUMTYPE _args);
 
+NUMTYPE c_parse(const char *code, NUMTYPE _dest);
+NUMTYPE lispmain(NUMTYPE, char **);
+
+NUMTYPE internal_syscall1(NUMTYPE);
+NUMTYPE internal_syscall2(NUMTYPE, NUMTYPE);
+NUMTYPE internal_syscall3(NUMTYPE, NUMTYPE, NUMTYPE);
+NUMTYPE internal_syscall4(NUMTYPE, NUMTYPE, NUMTYPE, NUMTYPE);
+
 #ifdef __cplusplus
 }
 #endif

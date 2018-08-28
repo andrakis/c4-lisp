@@ -8,6 +8,9 @@
 
 #include "native.h"
 #include "internal.h"
+#include "cell.h"
+#include "stacktrace.h"
+#include "syscalls.h"
 
 // return given mumber as a string
 std::string str(NUMTYPE n) { std::ostringstream os; os << n; return os.str(); }
@@ -15,11 +18,8 @@ const char *c_str(NUMTYPE n) { return str(n).c_str(); }
 
 // return true iff given character is '0'..'9'
 bool isdig(char c) { return isdigit(static_cast<unsigned char>(c)) != 0; }
-NUMTYPE c_isdig(char c) { return isdig(c); }
 
 ////////////////////// cell
-
-enum cell_type { Symbol, Number, List, Proc, Lambda };
 
 struct environment; // forward declaration; cell and environment reference each other
 typedef std::shared_ptr<environment> env_p;
@@ -48,52 +48,96 @@ struct cell {
 		list = c.list;
 		env = c.env;
 	}
+	bool is_list() const { return type == List; }
+	bool is_empty() const { return is_list() && list.empty(); }
+	size_t list_size() const { return is_list() ? list.size() : 0; }
 };
 
+#ifdef DEBUG
+template<typename T> T object_from_c(auto v) {
+	void *vv = (void*)v;
+	return static_cast<T>(vv);
+}
+NUMTYPE object_to_c(void *v) {
+	return (NUMTYPE)v;
+}
+NUMTYPE object_to_c(const void *v) {
+	return (NUMTYPE)v;
+}
+NUMTYPE number_from_c(auto v) {
+	return (NUMTYPE)v;
+}
+NUMTYPE number_to_c(NUMTYPE v) {
+	return v;
+}
+#define OBJ_FROM_C(type, value) object_from_c<type>(value)
+#define OBJ_TO_C(value)         object_to_c(value)
+#define NUMBER_FROM_C(value)    number_from_c(value)
+#define NUMBER_TO_C(value)      number_to_c(value)
+#else
+#define OBJ_FROM_C(type, value) (static_cast<type>((void*)value))
+#define OBJ_TO_C(value)         ((NUMTYPE)(value))
+#define NUMBER_FROM_C(value)    ((NUMTYPE)(value))
+#define NUMBER_TO_C(value)      ((NUMTYPE)(value))
+#endif
+
+#define CELL(value)             (OBJ_FROM_C(cell*, value))
+#define CELLS(value)            (OBJ_FROM_C(cells*, value))
+#define ENV(value)              (OBJ_FROM_C(environment*, value))
+#define ENV_P(value)            (OBJ_FROM_C(env_p*, value))
+
 NUMTYPE c_cell_new(NUMTYPE tag, const char *value) {
-	return (NUMTYPE)new cell((cell_type)tag, std::string(value));
+	//return (NUMTYPE)new cell((cell_type)tag, std::string(value));
+	cell *c = new cell((cell_type)tag, std::string(value));
+	return OBJ_TO_C(c);
 }
 
 // Reset (copy) values from another cell
 NUMTYPE c_cell_reset(NUMTYPE dest, NUMTYPE source) {
-	cell *d = (cell*)dest;
-	cell *s = (cell*)source;
+	//cell *d = (cell*)dest;
+	//cell *s = (cell*)source;
+	cell *d = CELL(dest);
+	cell *s = CELL(source);
 	d->reset(*s);
-	return (NUMTYPE)dest;
+	return OBJ_TO_C(d);
 }
 NUMTYPE c_cell_copy(NUMTYPE _cell) {
-	cell *c = (cell*)_cell;
+	cell *c = CELL(_cell);
 	cell *n = new cell(*c);
-	return (NUMTYPE)n;
+	return OBJ_TO_C(n);
+}
+NUMTYPE c_cell_empty(NUMTYPE _cell) {
+    cell *c = CELL(_cell);
+    return c->is_empty() ? 1 : 0;
 }
 NUMTYPE c_cell_env_get(NUMTYPE _cell) {
-	cell *c = (cell*)_cell;
+	cell *c = CELL(_cell);
 	env_p *e = &c->env;
-	return (NUMTYPE)e;
+	return OBJ_TO_C(e);
 }
 NUMTYPE c_cell_env_set(NUMTYPE _env, NUMTYPE _cell) {
-	env_p *env = (env_p*)_env;
-	cell *c = (cell*)_cell;
+	env_p *env = ENV_P(_env);
+	cell *c = CELL(_cell);
 	c->env.swap(*env);
-	return (NUMTYPE)env;
+	return OBJ_TO_C(env);
 }
 
 NUMTYPE c_free_cell(NUMTYPE _cell) {
-	cell *c = (cell*)_cell;
+	cell *c = CELL(_cell);
 	delete(c);
 	return 0;
 }
 
 NUMTYPE c_call_proc(NUMTYPE _cell, NUMTYPE _args) {
-	cell  *c = (cell*)_cell;
-	cells *args = (cells*)_args;
+	cell  *c = CELL(_cell);
+	cells *args = CELLS(_args);
 	// c->proc() returns a temporary
 	cell  *result = new cell(c->proc(*args));
-	return (NUMTYPE)result;
+	return OBJ_TO_C(result);
 }
 
 NUMTYPE c_list(NUMTYPE _content) {
-	cell *content = (cell*)_content;
+	cell *content = CELL(_content);
 	cell *c = new cell(List);
 	if(content == 0) {
 		c->list = cells();
@@ -103,16 +147,12 @@ NUMTYPE c_list(NUMTYPE _content) {
 		c->list = cells();
 		c->list.push_back(cell(*content));
 	}
-	return (NUMTYPE)c;
+	return OBJ_TO_C(c);
 }
 
 const cell false_sym(Symbol, "#f");
 const cell true_sym(Symbol, "#t"); // anything that isn't false_sym is true
 const cell nil(Symbol, "nil");
-
-NUMTYPE c_atom_false() { return (NUMTYPE)&false_sym; }
-NUMTYPE c_atom_true() { return (NUMTYPE)&true_sym; }
-NUMTYPE c_atom_nil() { return (NUMTYPE)&nil; }
 
 ////////////////////// environment
 
@@ -163,20 +203,23 @@ private:
 };
 
 NUMTYPE c_environment(NUMTYPE _outer) {
-	env_p *outer = (env_p*)_outer;
-	environment *env   = (outer != 0 ? new environment(*outer) : new environment());
+	env_p *outer = ENV_P(_outer);
+	environment *env = (outer != 0 ? new environment(*outer) : new environment());
 	env_p *p = new env_p(env);
-	return (NUMTYPE)p;
+	return OBJ_TO_C(p);
 }
 
 NUMTYPE c_free_env(NUMTYPE _env) {
-	env_p *env = (env_p*)_env;
+	//env_p *env = (env_p*)_env;
+	env_p *env = ENV_P(_env);
 	delete(env);
+    return 0;
 }
 
 NUMTYPE c_env_has(const char *_name, NUMTYPE _env) {
 	std::string name(_name);
-	env_p *env = (env_p*)_env;
+	//env_p *env = (env_p*)_env;
+	env_p *env = ENV_P(_env);
 	bool has = env->get()->has(name);
 
 	return has ? 1 : 0;
@@ -184,10 +227,10 @@ NUMTYPE c_env_has(const char *_name, NUMTYPE _env) {
 
 NUMTYPE c_env_get(const char *_name, NUMTYPE _env) {
 	std::string name(_name);
-	env_p *env = (env_p*)_env;
+	env_p *env = ENV_P(_env);
 	if(env->get()->has(name)) {
 		cell *found = &env->get()->find(name)[name];
-		return (NUMTYPE)found;
+		return OBJ_TO_C(found);
 	}
 
 	return 0;
@@ -196,12 +239,12 @@ NUMTYPE c_env_get(const char *_name, NUMTYPE _env) {
 // return (*env)[x.list[1].val] = eval(x.list[2], env);
 NUMTYPE c_env_set(const char *_name, NUMTYPE _value, NUMTYPE _env) {
 	std::string name(_name);
-	env_p *ep = (env_p*)_env;
+	env_p *ep = ENV_P(_env);
 	environment *env = ep->get();
 	cell *value = (cell*)_value;
 
 	(*env)[name] = *value;
-	return (NUMTYPE)&(*env)[name];
+	return OBJ_TO_C(&(*env)[name]);
 }
 
 ////////////////////// built-in primitive procedures
@@ -310,19 +353,19 @@ void add_globals(environment & env)
 }
 
 NUMTYPE c_add_globals(NUMTYPE _env) {
-	env_p *env = (env_p*)_env;
+	env_p *env = OBJ_FROM_C(env_p*, _env);
 	add_globals(*env->get());
-	return (NUMTYPE)env;
+	return OBJ_TO_C(env);
 }
 
 NUMTYPE c_cell_type(NUMTYPE _cell) {
-	cell *c = (cell*)_cell;
-	return (NUMTYPE)c->type;
+	cell *c = OBJ_FROM_C(cell*,_cell);
+	return NUMBER_TO_C(c->type);
 }
 
 NUMTYPE c_cell_value(NUMTYPE _cell) {
-	cell *c = (cell*)_cell;
-	return (NUMTYPE)c->val.c_str();
+	cell *c = OBJ_FROM_C(cell*, _cell);
+	return OBJ_TO_C((void*)c->val.c_str());
 }
 
 NUMTYPE c_cell_list(NUMTYPE _cell) {
@@ -333,7 +376,7 @@ NUMTYPE c_cell_list(NUMTYPE _cell) {
 }
 
 NUMTYPE c_cell_strcmp(const char *s, NUMTYPE _cell) {
-	cell *c = (cell*)_cell;
+	cell *c = OBJ_FROM_C(cell*, _cell);
 	return (c->val == s) ? 0 : 1;
 }
 
@@ -477,10 +520,14 @@ cell read(const std::string & s)
 	std::list<std::string> tokens(tokenize(s));
 	return read_from(tokens);
 }
-NUMTYPE c_parse(NUMTYPE str) {
-	std::string s((char*)str);
-	cell *c = new cell(read(s));
-	return (NUMTYPE)c;
+NUMTYPE c_parse(const char *str, NUMTYPE _dest) {
+	cell *dest = OBJ_FROM_C(cell*, _dest);
+	try {
+		dest->reset(read(std::string((char*)str)));
+		return 0;
+	} catch (...) {
+		return 1;
+	}
 }
 
 // convert given cell to a Lisp-readable string
@@ -501,22 +548,145 @@ std::string to_string(const cell & exp)
 	return exp.val;
 }
 
-NUMTYPE c_to_string(int _cell) {
+NUMTYPE c_to_string(NUMTYPE _cell) {
 	cell *c = (cell*)_cell;
 	std::string *s = new std::string(to_string(*c));
 	return (NUMTYPE)s->c_str();
 }
 
-NUMTYPE c_string_free(int _str) {
+NUMTYPE c_string_free(NUMTYPE _str) {
 	std::string *str = (std::string*)_str;
 	delete str;
 	return 0;
 }
 
-NUMTYPE c_cell_free(int _cell) {
+NUMTYPE c_cell_free(NUMTYPE _cell) {
 	cell *c = (cell*)_cell;
 	delete c;
 	return 0;
+}
+
+NUMTYPE unhandled_event(const std::stringstream &message) {
+	// In case we're not in a try/catch block
+	try {
+		throw StacktraceException(message.str());
+	} catch (StacktraceException se) {
+		throw;
+	}
+}
+
+// Syscall handlers
+NUMTYPE internal_syscall1(NUMTYPE signal) {
+	switch(signal) {
+		case SYS1_ATOM_FALSE: return OBJ_TO_C(&false_sym);
+		case SYS1_ATOM_TRUE: return OBJ_TO_C(&true_sym);
+		case SYS1_ATOM_NIL: return OBJ_TO_C(&nil);
+		case SYS1_CELL_NEW: return c_cell_new(Number, "0");
+	}
+
+	std::stringstream ss;
+	ss << "Invalid syscall #1: " << signal;
+	return unhandled_event(ss);
+}
+NUMTYPE internal_syscall2(NUMTYPE signal, NUMTYPE arg1) {
+    cell *c;
+    cells *l;
+	environment *e;
+	env_p *ep;
+
+	switch(signal) {
+        case SYS2_ISDIG:
+            return isdig((char)arg1) ? 1 : 0;
+		case SYS2_CELL_COPY:
+        case SYS2_CELL_EMPTY:
+		case SYS2_CELL_ENV_GET:
+		case SYS2_CELL_LIST:
+		case SYS2_CELL_TYPE:
+		case SYS2_CELL_VALUE:
+		case SYS2_FREE_CELL:
+            c = CELL(arg1);
+            switch(signal) {
+                case SYS2_CELL_COPY:
+                    return OBJ_TO_C(new cell(*c));
+                case SYS2_CELL_EMPTY:
+                    return c->is_empty() ? 1 : 0;
+                case SYS2_CELL_ENV_GET:
+                    return OBJ_TO_C(&c->env);
+                case SYS2_CELL_LIST: 
+                    return OBJ_TO_C(&c->list);
+                case SYS2_CELL_TYPE: 
+                    return NUMBER_TO_C(c->type);
+                case SYS2_CELL_VALUE: 
+                    return OBJ_TO_C(&c->val);
+                case SYS2_FREE_CELL:
+					delete c;
+					return 0;
+            }
+            break;
+		case SYS2_LIST:
+		case SYS2_LIST_EMPTY:
+		case SYS2_LIST_SIZE:
+            l = CELLS(arg1);
+            switch(signal) {
+                case SYS2_LIST:
+					return c_list(arg1);
+                case SYS2_LIST_EMPTY:
+					return l->empty() ? 1 : 0;
+                case SYS2_LIST_SIZE:
+					return NUMBER_TO_C(l->size());
+            }
+            break;
+		case SYS2_ENV:
+		case SYS2_FREE_ENV:
+			ep = ENV_P(arg1);
+            switch(signal) {
+                case SYS2_ENV:
+					if(ep != 0)
+						e = new environment(*ep);
+					else
+						e = new environment();
+					ep = new env_p(e);
+					return OBJ_TO_C(ep);
+                case SYS2_FREE_ENV:
+					delete ep;
+					return 0;
+            }
+            break;
+		case SYS2_ADD_GLOBS:
+			ep = ENV_P(arg1);
+			e = ep->get();
+			add_globals(*e);
+			return OBJ_TO_C(ep);
+	}
+	
+	std::stringstream ss;
+	ss << "Invalid syscall #2: " << signal << ", args: " << arg1;
+	return unhandled_event(ss);
+}
+NUMTYPE internal_syscall3(NUMTYPE signal, NUMTYPE arg1, NUMTYPE arg2) {
+	switch(signal) {
+		case SYS3_CELL_NEW: return c_cell_new(arg1, (const char*)arg2);
+		case SYS3_CELL_STRCMP: return c_cell_strcmp((const char*)arg1, arg2);
+		case SYS3_CELL_ENV_SET: return c_cell_env_set(arg1, arg2);
+		case SYS3_LIST_INDEX: return c_list_index(arg1, arg2);
+		case SYS3_LIST_PUSHB: return c_list_push_back(arg1, arg2);
+		case SYS3_ENV_GET: return c_env_get((const char *)arg1, arg2);
+		case SYS3_ENV_HAS: return c_env_has((const char *)arg1, arg2);
+		case SYS3_CALL_PROC: return c_call_proc(arg1, arg2);
+		case SYS3_PARSE: return c_parse((const char*)arg1, arg2);
+		case SYS3_LISP_MAIN: return lispmain(arg1, (char**)arg2);
+	}
+	std::stringstream ss;
+	ss << "Invalid syscall #3: " << signal << ", args: " << arg1 << ", " << arg2;
+	return unhandled_event(ss);
+}
+NUMTYPE internal_syscall4(NUMTYPE signal, NUMTYPE arg1, NUMTYPE arg2, NUMTYPE arg3) {
+	switch(signal) {
+		case SYS4_ENV_SET: return c_env_set((const char*)arg1, arg2, arg3);
+	}
+	std::stringstream ss;
+	ss << "Invalid syscall #4: " << signal << ", args: " << arg1 << ", " << arg2 << ", " << arg3;
+	return unhandled_event(ss);
 }
 
 // the default read-eval-print-loop
@@ -622,3 +792,4 @@ int main (void) {
 	scheme_complete_test();
 }
 #endif
+

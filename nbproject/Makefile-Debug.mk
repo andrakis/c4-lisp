@@ -38,16 +38,18 @@ OBJECTFILES= \
 	${OBJECTDIR}/c5.o \
 	${OBJECTDIR}/extras.o \
 	${OBJECTDIR}/internal.o \
+	${OBJECTDIR}/lisp4.o \
 	${OBJECTDIR}/main.o \
+	${OBJECTDIR}/stacktrace.o \
 	${OBJECTDIR}/syscalls.o
 
 
 # C Compiler Flags
-CFLAGS=-Wno-format
+CFLAGS=-Wno-format -rdynamic
 
 # CC Compiler Flags
-CCFLAGS=-Wno-format
-CXXFLAGS=-Wno-format
+CCFLAGS=-Wno-format -rdynamic -Wall -Werror
+CXXFLAGS=-Wno-format -rdynamic -Wall -Werror
 
 # Fortran Compiler Flags
 FFLAGS=
@@ -69,27 +71,37 @@ ${CND_DISTDIR}/${CND_CONF}/${CND_PLATFORM}/lisp4: ${OBJECTFILES}
 ${OBJECTDIR}/c5.o: c5.c 
 	${MKDIR} -p ${OBJECTDIR}
 	${RM} "$@.d"
-	$(COMPILE.c) -g -I. -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/c5.o c5.c
+	$(COMPILE.c) -g -DDEBUG -DGCC_RDYNAMIC -I. -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/c5.o c5.c
 
 ${OBJECTDIR}/extras.o: extras.c 
 	${MKDIR} -p ${OBJECTDIR}
 	${RM} "$@.d"
-	$(COMPILE.c) -g -I. -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/extras.o extras.c
+	$(COMPILE.c) -g -DDEBUG -DGCC_RDYNAMIC -I. -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/extras.o extras.c
 
 ${OBJECTDIR}/internal.o: internal.cpp 
 	${MKDIR} -p ${OBJECTDIR}
 	${RM} "$@.d"
-	$(COMPILE.cc) -g -I. -std=c++11 -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/internal.o internal.cpp
+	$(COMPILE.cc) -g -DCPP14 -DDEBUG -DGCC_RDYNAMIC -I. -I./non-contrib/string_view-standalone/include -std=c++14 -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/internal.o internal.cpp
+
+${OBJECTDIR}/lisp4.o: lisp4.c 
+	${MKDIR} -p ${OBJECTDIR}
+	${RM} "$@.d"
+	$(COMPILE.c) -g -DDEBUG -DGCC_RDYNAMIC -I. -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/lisp4.o lisp4.c
 
 ${OBJECTDIR}/main.o: main.cpp 
 	${MKDIR} -p ${OBJECTDIR}
 	${RM} "$@.d"
-	$(COMPILE.cc) -g -I. -std=c++11 -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/main.o main.cpp
+	$(COMPILE.cc) -g -DCPP14 -DDEBUG -DGCC_RDYNAMIC -I. -I./non-contrib/string_view-standalone/include -std=c++14 -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/main.o main.cpp
+
+${OBJECTDIR}/stacktrace.o: stacktrace.cpp 
+	${MKDIR} -p ${OBJECTDIR}
+	${RM} "$@.d"
+	$(COMPILE.cc) -g -DCPP14 -DDEBUG -DGCC_RDYNAMIC -I. -I./non-contrib/string_view-standalone/include -std=c++14 -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/stacktrace.o stacktrace.cpp
 
 ${OBJECTDIR}/syscalls.o: syscalls.c 
 	${MKDIR} -p ${OBJECTDIR}
 	${RM} "$@.d"
-	$(COMPILE.c) -g -I. -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/syscalls.o syscalls.c
+	$(COMPILE.c) -g -DDEBUG -DGCC_RDYNAMIC -I. -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/syscalls.o syscalls.c
 
 # Subprojects
 .build-subprojects:

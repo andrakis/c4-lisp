@@ -39,6 +39,7 @@ OBJECTFILES= \
 	${OBJECTDIR}/extras.o \
 	${OBJECTDIR}/internal.o \
 	${OBJECTDIR}/main.o \
+	${OBJECTDIR}/stacktrace.o \
 	${OBJECTDIR}/syscalls.o
 
 
@@ -69,27 +70,32 @@ ${CND_DISTDIR}/${CND_CONF}/${CND_PLATFORM}/lisp4: ${OBJECTFILES}
 ${OBJECTDIR}/c5.o: c5.c 
 	${MKDIR} -p ${OBJECTDIR}
 	${RM} "$@.d"
-	$(COMPILE.c) -O2 -I. -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/c5.o c5.c
+	$(COMPILE.c) -O2 -DNDEBUG -DRELEASE -I. -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/c5.o c5.c
 
 ${OBJECTDIR}/extras.o: extras.c 
 	${MKDIR} -p ${OBJECTDIR}
 	${RM} "$@.d"
-	$(COMPILE.c) -O2 -I. -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/extras.o extras.c
+	$(COMPILE.c) -O2 -DNDEBUG -DRELEASE -I. -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/extras.o extras.c
 
 ${OBJECTDIR}/internal.o: internal.cpp 
 	${MKDIR} -p ${OBJECTDIR}
 	${RM} "$@.d"
-	$(COMPILE.cc) -O2 -I. -std=c++11 -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/internal.o internal.cpp
+	$(COMPILE.cc) -O2 -DCPP14 -DNDEBUG -DRELEASE -I. -I./non-contrib/string_view-standalone/include -std=c++14 -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/internal.o internal.cpp
 
 ${OBJECTDIR}/main.o: main.cpp 
 	${MKDIR} -p ${OBJECTDIR}
 	${RM} "$@.d"
-	$(COMPILE.cc) -O2 -I. -std=c++11 -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/main.o main.cpp
+	$(COMPILE.cc) -O2 -DCPP14 -DNDEBUG -DRELEASE -I. -I./non-contrib/string_view-standalone/include -std=c++14 -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/main.o main.cpp
+
+${OBJECTDIR}/stacktrace.o: stacktrace.cpp 
+	${MKDIR} -p ${OBJECTDIR}
+	${RM} "$@.d"
+	$(COMPILE.cc) -O2 -DCPP14 -DNDEBUG -DRELEASE -I. -I./non-contrib/string_view-standalone/include -std=c++14 -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/stacktrace.o stacktrace.cpp
 
 ${OBJECTDIR}/syscalls.o: syscalls.c 
 	${MKDIR} -p ${OBJECTDIR}
 	${RM} "$@.d"
-	$(COMPILE.c) -O2 -I. -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/syscalls.o syscalls.c
+	$(COMPILE.c) -O2 -DNDEBUG -DRELEASE -I. -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/syscalls.o syscalls.c
 
 # Subprojects
 .build-subprojects:

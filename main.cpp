@@ -1,9 +1,3 @@
-/*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
- */
-
 /* 
  * File:   main.cpp.cpp
  * Author: daedalus
@@ -11,15 +5,28 @@
  * Created on 20 July 2018, 9:28 PM
  */
 
-#include <cstdlib>
+#include "stacktrace.h"
 
-using namespace std;
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+int c5_main(int argc, char **argv);
+
+#ifdef __cplusplus
+}
+#endif
 
 /*
- * 
+ * C++ entry point.
  */
-int cppmain(int argc, char** argv) {
-
+int main(int argc, char** argv) {
+	try {
+		return c5_main(argc, argv);
+	} catch (StacktraceException se) {
+		se.printStackTrace();
+		return -1;
+	}
 	return 0;
 }
 

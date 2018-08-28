@@ -1,0 +1,3 @@
+[submodule "contrib/string_view-standalone"]
+	path = non-contrib/string_view-standalone
+	url = https://github.com/bitwizeshift/string_view-standalone
