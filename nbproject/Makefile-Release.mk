@@ -38,6 +38,7 @@ OBJECTFILES= \
 	${OBJECTDIR}/c5.o \
 	${OBJECTDIR}/extras.o \
 	${OBJECTDIR}/internal.o \
+	${OBJECTDIR}/lisp4.o \
 	${OBJECTDIR}/main.o \
 	${OBJECTDIR}/stacktrace.o \
 	${OBJECTDIR}/syscalls.o
@@ -81,6 +82,11 @@ ${OBJECTDIR}/internal.o: internal.cpp
 	${MKDIR} -p ${OBJECTDIR}
 	${RM} "$@.d"
 	$(COMPILE.cc) -O2 -DCPP14 -DNDEBUG -DRELEASE -I. -I./non-contrib/string_view-standalone/include -std=c++14 -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/internal.o internal.cpp
+
+${OBJECTDIR}/lisp4.o: lisp4.c 
+	${MKDIR} -p ${OBJECTDIR}
+	${RM} "$@.d"
+	$(COMPILE.c) -O2 -DNDEBUG -DRELEASE -I. -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/lisp4.o lisp4.c
 
 ${OBJECTDIR}/main.o: main.cpp 
 	${MKDIR} -p ${OBJECTDIR}

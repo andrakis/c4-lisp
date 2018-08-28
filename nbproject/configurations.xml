@@ -167,6 +167,8 @@
       </item>
       <item path="internal.h" ex="false" tool="3" flavor2="0">
       </item>
+      <item path="lisp4.c" ex="false" tool="0" flavor2="0">
+      </item>
       <item path="main.cpp" ex="false" tool="1" flavor2="0">
       </item>
       <item path="native.h" ex="false" tool="3" flavor2="0">
