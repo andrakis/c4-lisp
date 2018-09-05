@@ -13,6 +13,9 @@
 enum { Symbol, Number, List, Proc, Lambda };
 // };
 
+// Special values
+enum { ENV_NOPARENT = 0 };
+
 // enum Syscalls1 {
 // syscalls that take no argument (the signal only)
 enum {
@@ -31,9 +34,11 @@ enum {
 	SYS2_CELL_COPY, // (int Cell) -> int. copy a cell from a pointer
 	SYS2_CELL_EMPTY,// (int Cell) -> 1 | 0. check if empty
 	SYS2_CELL_ENV_GET, // (int Cell) -> int. get pointer to cell's env
+	SYS2_CELL_FREE, // (int Cell) -> void. Free a cell object
 	SYS2_CELL_FRONT, // (int Cell) -> int. Cell
 	SYS2_CELL_LIST, // (int Cell) -> int.
 	SYS2_CELL_SIZE, // (int Cell) -> int.
+	SYS2_CELL_CSTR, // (int Cell) -> char*.
 	SYS2_CELL_TAIL, // (int Cell) -> int. List
 	SYS2_CELL_TYPE, // (int Cell) -> int. Tag
 	SYS2_CELL_VALUE,// (int Cell) -> int. Value as string
@@ -42,7 +47,6 @@ enum {
 	SYS2_LIST_FREE, // (int List) -> void.
 	SYS2_LIST_SIZE, // (int List) -> int.
 	SYS2_ENV,       // (int Outer) -> int.
-	SYS2_FREE_CELL, // (int Cell) -> void. Free a cell object
 	SYS2_FREE_ENV,  // (int Env) -> void. Free an environment object
 	SYS2_ADD_GLOBS,  // (int Env) -> void. Add global symbols to given env
 	_SYS2_END        // Must be last element
@@ -101,6 +105,10 @@ int cell_empty(void *cell) {
 	return syscall2(SYS2_CELL_EMPTY, (int)cell);
 }
 
+void cell_free(void *cell) {
+	syscall2(SYS2_CELL_FREE, (int)cell);
+}
+
 void *cell_front(void *cell) {
 	return (void*)syscall2(SYS2_CELL_FRONT, (int)cell);
 }
@@ -111,6 +119,10 @@ void *cell_index(int index, void *cell) {
 
 int cell_size(void *cell) {
 	return syscall2(SYS2_CELL_SIZE, (int)cell);
+}
+
+char *cell_cstr(void *cell) {
+	return (char*)syscall2(SYS2_CELL_CSTR, (int)cell);
 }
 
 void *cell_index_default(int index, void *def, void *cell) {
@@ -144,16 +156,33 @@ int env_has(char *s, void *env) {
 	return syscall3(SYS3_ENV_HAS, (int)(void*)s, (int)env);
 }
 
+// env_lookup(char*, environment*) -> cell*();
 void *env_lookup(void *name, void *env) {
 	return (void*)syscall3(SYS3_ENV_LOOKUP, (int)name, (int)env);
 }
 
+// env_new(environment*Parent) -> environment*()
+void *env_new(void *parent) {
+	return (void*)syscall2(SYS2_ENV, (int)parent);
+}
+
+// env_new_args(cells *, cells *, environment*) -> environment*();
 void *env_new_args(void *names, void *values, void *parent) {
 	return (void*)syscall4(SYS4_ENV_NEWARGS, (int)names, (int)values, (int)parent);
 }
 
+// env_set(char*, char*, environment*e) -> e;
 void *env_set(void *name, void *value, void *env) {
 	return (void*)syscall4(SYS4_ENV_SET, (int)name, (int)value, (int)env);
+}
+
+// env_free(environment*) -> void;
+void env_free(void *env) {
+	syscall2(SYS2_FREE_ENV, (int)env);
+}
+
+void add_globals(void *env) {
+	syscall2(SYS2_ADD_GLOBS, (int)env);
 }
 
 void list_free(void *list) {
@@ -190,24 +219,25 @@ void *eval(void *x, void *env) {
 	first = cell_front(x);
 	type = cell_type(cell_front(x));
 	if(type == Symbol) {
-		if(cell_strcmp("quote", first) == 0)			// (quote efirstp)
-			return cell_tail(first);
+		if(cell_strcmp("quote", first) == 0)			// (quote exp)
+			return cell_tail(x);
 		if(cell_strcmp("if", first) == 0) {		// (if test conseq [alt])
-			test = cell_index(1, first);
-			conseq = cell_index(2, first);
-			alt = cell_index_default(3, sym_nil, first);
+			test = cell_index(1, x);
+			conseq = cell_index(2, x);
+			alt = cell_index_default(3, sym_nil, x);
 			result = eval(test, env);
 			result = (cell_strcmp(s_false, result) == 0) ? alt : conseq;
+			// TODO: free x
 			return result;
 		}
 		if(cell_strcmp("set!", first) == 0) {	// (set! var exp)
-			result = eval(cell_index(2, first), env);
-			env_set(cell_index(1, first), result, env);
+			result = eval(cell_index(2, x), env);
+			env_set(cell_index(1, x), result, env);
 			return result;
 		}
 		if(cell_strcmp("define", first) == 0) {	// (define var exp)
-			result = eval(cell_index(2, first), env);
-			env = env_set(cell_index(1, first), result, env);
+			result = eval(cell_index(2, x), env);
+			env = env_set(cell_index(1, x), result, env);
 			return result;
 		}
 		if(cell_strcmp("lambda", first) == 0)	// (lambda (var*) exp)
@@ -236,12 +266,15 @@ void *eval(void *x, void *env) {
 			cell_index(1, proc) /* arg names list */,
 			exps                /* values */,
 			env                 /* parent */);
+		// exps no longer needed
 		list_free(exps);
 		result = eval(cell_index(2, proc), env);
+		// TODO: free x
 		return result;
 	} else if(type == Proc) {
 		result = proc_invoke(exps, proc);
 		list_free(exps);
+		// TODO: free x
 		return result;
 	}
 
@@ -251,10 +284,12 @@ void *eval(void *x, void *env) {
 
 #define main lispmain
 
+int debug;
+
 int main(int argc, char **argv)
 {
 	void *global, *tokens;
-	char *code;
+	char *code, *tmp;
 
 	// Ensure syscalls are up to date
 	if(!syscall_init(1, _SYS1_END) ||
@@ -265,6 +300,8 @@ int main(int argc, char **argv)
 		return -1;
 	}
 
+	debug = 1;
+
 	// Setup predefined symbols used in eval
 	s_quote = "quote";
 	s_if = "if";
@@ -274,8 +311,9 @@ int main(int argc, char **argv)
 	s_begin = "begin";
 
 	code = "(print \"Hello!\")";
-	global = (void*)syscall2(SYS2_ENV, 0); // no parent
-	syscall2(SYS2_ADD_GLOBS, (int)global); // add globals
+	global = env_new(ENV_NOPARENT);
+	add_globals(global);
+	if(debug) printf(" env.global: %x\n", global);
 
 	printf("Has +: %d\n", env_has("+", global));
 	printf("Has foo: %d\n", env_has("foo", global));
@@ -285,10 +323,16 @@ int main(int argc, char **argv)
 		printf("Failed to parse code: %s\n", code);
 		return 1;
 	}
+	if(debug) {
+		tmp = cell_cstr(tokens);
+		printf(" tokens: %x (%s)\n", tokens, tmp);
+		free(tmp);
+	}
 
-	eval(tokens, global);
+	//eval(tokens, global);
 
 	printf("Cleaning up\n");
-	syscall2(SYS2_FREE_ENV, (int)global);
+	cell_free(tokens);
+	env_free(global);
 	return 0;
 }

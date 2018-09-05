@@ -4,7 +4,10 @@
 #include <memory>
 #include <sstream>
 #include <string>
+#include <string.h>
 #include <vector>
+
+#include <bpstd/string_view.hpp>
 
 #include "native.h"
 #include "internal.h"
@@ -12,24 +15,31 @@
 #include "stacktrace.h"
 #include "syscalls.h"
 
+// Forward declarations
+struct cell;
+std::string to_string(const cell &exp);
+
+struct environment; // forward declaration; cell and environment reference each other
+typedef std::shared_ptr<environment> env_p;
+
+typedef std::vector<cell> cells;
+typedef cells::const_iterator cellit;
+
+NUMTYPE unhandled_event(bpstd::string_view reason);
+inline NUMTYPE unhandled_event(const std::stringstream &ss) {
+	return unhandled_event(ss.str());
+}
+
+
 // return given mumber as a string
 std::string str(NUMTYPE n) { std::ostringstream os; os << n; return os.str(); }
 const char *c_str(NUMTYPE n) { return str(n).c_str(); }
 
 // return true iff given character is '0'..'9'
 bool isdig(char c) { return isdigit(static_cast<unsigned char>(c)) != 0; }
-
+					// a variant that can hold any kind of lisp value
 ////////////////////// cell
 
-struct environment; // forward declaration; cell and environment reference each other
-typedef std::shared_ptr<environment> env_p;
-
-struct cell;
-
-typedef std::vector<cell> cells;
-typedef cells::const_iterator cellit;
-
-					// a variant that can hold any kind of lisp value
 struct cell {
 	typedef cell(*proc_type)(const std::vector<cell> &);
 	typedef std::vector<cell>::const_iterator iter;
@@ -49,11 +59,40 @@ struct cell {
 		env = c.env;
 	}
 	bool is_list() const { return type == List; }
-	bool is_empty() const { return is_list() && list.empty(); }
+	bool is_empty() const { return is_list() ? list.empty() : true; }
 	size_t list_size() const { return is_list() ? list.size() : 0; }
 };
 
 #ifdef DEBUG
+
+// TODO? Might be useful for checking types given from C
+const long _C_OBJ_MAGIC = 0xDEADBEEF;
+static int _c_obj_uid_counter = 0;
+struct _c_obj_container_base {
+	template<typename T> T getAs() {
+		return static_cast<T>(obj);
+	}
+	int uid;
+	long magic;
+protected:
+	_c_obj_container_base(void *_obj) :
+		uid(++_c_obj_uid_counter),
+		magic(uid ^ _C_OBJ_MAGIC),
+		obj(_obj) {
+	}
+	void *obj;
+};
+
+template<typename Inner>
+struct _c_obj_container : public _c_obj_container_base {
+	_c_obj_container(Inner value) :
+		_c_obj_container_base((void*)value) {
+	}
+	Inner get() {
+		return getAs<Inner>();
+	}
+};
+
 template<typename T> T object_from_c(auto v) {
 	void *vv = (void*)v;
 	return static_cast<T>(vv);
@@ -94,8 +133,6 @@ NUMTYPE c_cell_new(NUMTYPE tag, const char *value) {
 
 // Reset (copy) values from another cell
 NUMTYPE c_cell_reset(NUMTYPE dest, NUMTYPE source) {
-	//cell *d = (cell*)dest;
-	//cell *s = (cell*)source;
 	cell *d = CELL(dest);
 	cell *s = CELL(source);
 	d->reset(*s);
@@ -210,7 +247,6 @@ NUMTYPE c_environment(NUMTYPE _outer) {
 }
 
 NUMTYPE c_free_env(NUMTYPE _env) {
-	//env_p *env = (env_p*)_env;
 	env_p *env = ENV_P(_env);
 	delete(env);
     return 0;
@@ -218,7 +254,6 @@ NUMTYPE c_free_env(NUMTYPE _env) {
 
 NUMTYPE c_env_has(const char *_name, NUMTYPE _env) {
 	std::string name(_name);
-	//env_p *env = (env_p*)_env;
 	env_p *env = ENV_P(_env);
 	bool has = env->get()->has(name);
 
@@ -375,35 +410,52 @@ NUMTYPE c_cell_list(NUMTYPE _cell) {
 	return (NUMTYPE)&c->list;
 }
 
+// c_cell_str(cell*) -> char*;
+// Caller is responsible for freeing the resulting string via free(3)
+NUMTYPE c_cell_cstr(const cell &c) {
+	std::stringstream ss;
+	std::string s;
+	char *result;
+	
+	ss << to_string(c);
+	s = ss.str();
+	result = (char*)malloc(s.length() + 1);
+	if(!result)
+		return 0;
+	strcpy(result, s.c_str());
+	result[s.length()] = '\0'; // TODO: needed?
+	return OBJ_TO_C(result);
+}
+
 NUMTYPE c_cell_strcmp(const char *s, NUMTYPE _cell) {
-	cell *c = OBJ_FROM_C(cell*, _cell);
+	cell *c = CELL(_cell);
 	return (c->val == s) ? 0 : 1;
 }
 
 NUMTYPE c_list_empty(NUMTYPE _list) {
-	cells *list = (cells*)_list;
+	cells *list = CELLS(_list);
 	return list->empty() ? 1 : 0;
 }
 
 NUMTYPE c_list_size(NUMTYPE _list) {
-	cells *list = (cells*)_list;
+	cells *list = CELLS(_list);
 	return (NUMTYPE)list->size();
 }
 
-NUMTYPE c_list_index(NUMTYPE index, NUMTYPE _list) {
-	cells *list = (cells*)_list;
+NUMTYPE c_list_index(NUMTYPE index, NUMTYPE _list) NOEXCEPT {
+	cells *list = CELLS(_list);
 
 	try {
 		cell *found = &(*list)[index];
-		return (NUMTYPE)found;
+		return OBJ_TO_C(found);
 	} catch (...) {
 		return 0;
 	}
 }
 
 NUMTYPE c_list_push_back(NUMTYPE _cell, NUMTYPE _list) {
-	cell *c = (cell*)_cell;
-	cells *list = (cells*)_list;
+	cell *c = CELL(_cell);
+	cells *list = CELLS(_list);
 	list->push_back(*c);
 	return 0;
 }
@@ -520,8 +572,8 @@ cell read(const std::string & s)
 	std::list<std::string> tokens(tokenize(s));
 	return read_from(tokens);
 }
-NUMTYPE c_parse(const char *str, NUMTYPE _dest) {
-	cell *dest = OBJ_FROM_C(cell*, _dest);
+NUMTYPE c_parse(const char *str, NUMTYPE _dest) NOEXCEPT {
+	cell *dest = CELL(_dest);
 	try {
 		dest->reset(read(std::string((char*)str)));
 		return 0;
@@ -549,7 +601,7 @@ std::string to_string(const cell & exp)
 }
 
 NUMTYPE c_to_string(NUMTYPE _cell) {
-	cell *c = (cell*)_cell;
+	cell *c = CELL(_cell);
 	std::string *s = new std::string(to_string(*c));
 	return (NUMTYPE)s->c_str();
 }
@@ -566,10 +618,10 @@ NUMTYPE c_cell_free(NUMTYPE _cell) {
 	return 0;
 }
 
-NUMTYPE unhandled_event(const std::stringstream &message) {
+NUMTYPE unhandled_event(bpstd::string_view reason) {
 	// In case we're not in a try/catch block
 	try {
-		throw StacktraceException(message.str());
+		throw StacktraceException(reason);
 	} catch (StacktraceException se) {
 		throw;
 	}
@@ -599,11 +651,14 @@ NUMTYPE internal_syscall2(NUMTYPE signal, NUMTYPE arg1) {
             return isdig((char)arg1) ? 1 : 0;
 		case SYS2_CELL_COPY:
         case SYS2_CELL_EMPTY:
+		case SYS2_CELL_FRONT:
 		case SYS2_CELL_ENV_GET:
 		case SYS2_CELL_LIST:
+		case SYS2_CELL_SIZE:
+		case SYS2_CELL_CSTR:
 		case SYS2_CELL_TYPE:
 		case SYS2_CELL_VALUE:
-		case SYS2_FREE_CELL:
+		case SYS2_CELL_FREE:
             c = CELL(arg1);
             switch(signal) {
                 case SYS2_CELL_COPY:
@@ -618,9 +673,20 @@ NUMTYPE internal_syscall2(NUMTYPE signal, NUMTYPE arg1) {
                     return NUMBER_TO_C(c->type);
                 case SYS2_CELL_VALUE: 
                     return OBJ_TO_C(&c->val);
-                case SYS2_FREE_CELL:
+                case SYS2_CELL_FREE:
 					delete c;
 					return 0;
+				case SYS2_CELL_FRONT:
+					if(c->is_empty())
+						return OBJ_TO_C(&nil);
+					return OBJ_TO_C(&c->list.front());
+				case SYS2_CELL_SIZE:
+					if(c->is_list())
+						return NUMBER_TO_C(c->list.size());
+					else
+						return c->val.length();
+				case SYS2_CELL_CSTR:
+					return c_cell_cstr(*c);
             }
             break;
 		case SYS2_LIST:

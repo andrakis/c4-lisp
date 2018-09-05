@@ -1,9 +1,3 @@
-/*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
- */
-
 /* 
  * File:   stacktrace.h
  * Author: daedalus
@@ -29,25 +23,40 @@
 #ifdef __cplusplus
 #include <exception>
 #include <memory>
+#include <sstream>
 #include <bpstd/string_view.hpp>
 
 class StacktraceException : public std::exception {
+	std::string message;
+public:
+	StacktraceException(bpstd::string_view reason) {
+		std::stringstream ss;
+		ss << "Exception: " << reason << std::endl;
 	#if TARGET_GCC
 		int frames;
 		void *callstack[STACKTRACE_MAXDEPTH];
-	#endif /* TARGET_GCC */
-	std::string message;
-public:
-	StacktraceException(bpstd::string_view);
-	StacktraceException(const StacktraceException &);
-	virtual ~StacktraceException();
-	void printStackTrace();
+		frames = backtrace(callstack, STACKTRACE_MAXDEPTH);
+		ss << "Stack follows:" << std::endl;
+		char **symbols = backtrace_symbols(callstack, frames);
+		for(int i = 0; i < frames; ++i) {
+			ss << symbols[i] << std::endl;
+		}
+	#elif TARGET_WIN
+		ss << "Stack trace unavailable on this platform." << std::endl;
+	#endif
+		message = ss.str();
+	}
+	StacktraceException(const StacktraceException &other) {
+		message = other.message;
+	}
+	~StacktraceException() { }
+	const char *what() const noexcept {
+		return message.c_str();
+	}
 };
 
 extern "C" {
 #endif /* __cplusplus */
-
-void c_st_throw(char*);
 
 #ifdef __cplusplus
 }

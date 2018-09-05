@@ -20,7 +20,7 @@ NUMTYPE c_cell_value(NUMTYPE _cell); // const char *
 NUMTYPE c_list(NUMTYPE _content);
 NUMTYPE c_list_empty(NUMTYPE _list);
 NUMTYPE c_list_size(NUMTYPE _list);
-NUMTYPE c_list_index(NUMTYPE index, NUMTYPE _list);
+NUMTYPE c_list_index(NUMTYPE index, NUMTYPE _list) NOEXCEPT;
 NUMTYPE c_list_push_back(NUMTYPE _cell, NUMTYPE _list);
 NUMTYPE c_atom_false();
 NUMTYPE c_atom_true();
@@ -37,7 +37,7 @@ NUMTYPE c_env_set(const char *_name, NUMTYPE _value, NUMTYPE _env);
 NUMTYPE c_add_globals(NUMTYPE _env);
 NUMTYPE c_call_proc(NUMTYPE _cell, NUMTYPE _args);
 
-NUMTYPE c_parse(const char *code, NUMTYPE _dest);
+NUMTYPE c_parse(const char *code, NUMTYPE _dest) NOEXCEPT;
 NUMTYPE lispmain(NUMTYPE, char **);
 
 NUMTYPE internal_syscall1(NUMTYPE);

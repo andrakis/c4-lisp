@@ -1,10 +1,15 @@
-// c4.c - C in four functions
+/**
+ * Part of the c4-lisp (aka c5) project.
+ * 
+ * Original c4.c comments:
+	// c4.c - C in four functions
 
-// char, int, and pointer types
-// if, while, return, and expression statements
-// just enough features to allow self-compilation and a bit more
+	// char, int, and pointer types
+	// if, while, return, and expression statements
+	// just enough features to allow self-compilation and a bit more
 
-// Written by Robert Swierczek
+	// Written by Robert Swierczek
+ */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -102,7 +107,7 @@ enum {
 void next()
 {
 	char *pp;
-	int t, tt;
+	int t;
 
 	while (tk = *p) {
 		++p;
@@ -397,7 +402,8 @@ void stmt()
 }
 
 int run_cycle(int *process, int cycles) {
-	int *pc, *sp, *bp, a, cycle, max_cycle; // vm registers
+	int *pc, *sp, *bp, a; // vm registers
+	int cycle, rem_cycle; // cycle counts
 	int i, *t; // temps
 
 	if(process[B_magic] != B_MAGIC) {
@@ -414,10 +420,10 @@ int run_cycle(int *process, int cycles) {
 	bp    = (int*)process[B_bp];
 	a     = process[B_a];
 	cycle = process[B_cycle];
-    max_cycle = cycle + cycles;
+    rem_cycle = cycles;
 
-	while(++cycle <= max_cycle) {
-		i = *pc++;
+	while(--rem_cycle > 0) {
+		i = *pc++; ++cycle;
 		if (debug) {
 		  printf("%d> %.4s", cycle, &opcodes[i * 5]);
 		  if (i <= ADJ) printf(" %d\n", *pc); else printf("\n");
@@ -467,7 +473,7 @@ int run_cycle(int *process, int cycles) {
 			if(verbose) printf("exit(%d) cycle = %d\n", *sp, cycle);
 			process[B_halted] = 1;
 			process[B_exitcode] = *sp;
-			max_cycle = 0; 
+			rem_cycle = 0; 
 		}
 		else if (i == SYS1) { a = (int)syscall1(*sp); }
 		else if (i == SYS2) { a = (int)syscall2(sp[1], *sp); }
@@ -479,7 +485,7 @@ int run_cycle(int *process, int cycles) {
 			printf("unknown instruction = %d! cycle = %d\n", i, cycle);
 			process[B_halted] = 1;
 			process[B_exitcode] = -1;
-			cycles = 0; 
+			rem_cycle = 0; 
 		}
 	}
 
@@ -747,10 +753,18 @@ int main(int argc, char **argv)
 		}
 		// -L      enter lispmain
 		else if((*argv)[1] == 'L') {
-			free(processes);
 			--argc; ++argv;
-			free(processes);
+#if 0
+			// start lisp4.c instead
+			processes[proc_count++] = (int)"lisp4.c";
+			if(0) // Dummy out the next call
+#else
+				free(processes);
+#if 0
+			if(0) // Dummy out the next call
+#endif
 			return c5_lispmain(argc, argv);
+#endif
 		}
 		// -v      enable verbose mode
 		else if((*argv)[1] == 'v') { verbose = 1; }
@@ -763,13 +777,14 @@ int main(int argc, char **argv)
 		}
 		--argc; ++argv;
 	}
-	if (argc < 1) { free(processes); printf("usage: c5 [-L] [-s] [-d] [-v] [-c nnn] [-r file] file args...\n"); return -1; }
-	processes[proc_count++] = (int)*argv;
+	if (proc_count < 1 && argc < 1) { free(processes); printf("usage: c5 [-L] [-s] [-d] [-v] [-c nnn] [-r file] file args...\n"); return -1; }
+	if (argc > 0) processes[proc_count++] = (int)*argv;
 
 	// Start all processes
 	i = 0;
 	while(i < proc_count) {
 		tmp = (char*)processes[i];
+		if (verbose) printf("->Start process: %s\n", tmp);
 		if ((fd = open(tmp, 0)) < 0) {
 			printf("could not open(%s), ensure options are before filename\n", tmp); return -1;
 		}

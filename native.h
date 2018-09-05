@@ -5,6 +5,7 @@
  *   NUMTYPE   : appropriate number type (int or long) depending on above
  *   TARGET_WIN: compiling for windows
  *   TARGET_GCC: compiling with gcc
+ *   NOEXCEPT  : on C: (empty), on C++: noexcept
  * These allow for platform handling behaviour based on compiler.
  * 
  * The following more specific defines are presently not used for other
@@ -19,6 +20,12 @@
  * */
 #ifndef __NATIVE_H
 #define __NATIVE_H
+
+#ifdef __cplusplus
+	#define NOEXCEPT noexcept
+#else
+	#define NOEXCEPT
+#endif
 
 /* Determine whether we're in 32 or 64bit mode */
 #if !defined(ENV64BIT) && !defined(ENV32BIT)

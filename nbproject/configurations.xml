@@ -26,7 +26,6 @@
       <itemPath>internal.cpp</itemPath>
       <itemPath>lisp4.c</itemPath>
       <itemPath>main.cpp</itemPath>
-      <itemPath>stacktrace.cpp</itemPath>
       <itemPath>syscalls.c</itemPath>
     </logicalFolder>
     <logicalFolder name="TestFiles"
@@ -101,8 +100,6 @@
       </item>
       <item path="native.h" ex="false" tool="3" flavor2="0">
       </item>
-      <item path="stacktrace.cpp" ex="false" tool="1" flavor2="0">
-      </item>
       <item path="stacktrace.h" ex="false" tool="3" flavor2="0">
       </item>
       <item path="syscalls.c" ex="false" tool="0" flavor2="0">
@@ -172,8 +169,6 @@
       <item path="main.cpp" ex="false" tool="1" flavor2="0">
       </item>
       <item path="native.h" ex="false" tool="3" flavor2="0">
-      </item>
-      <item path="stacktrace.cpp" ex="false" tool="1" flavor2="0">
       </item>
       <item path="stacktrace.h" ex="false" tool="3" flavor2="0">
       </item>

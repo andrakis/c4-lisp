@@ -5,6 +5,7 @@
  * Created on 20 July 2018, 9:28 PM
  */
 
+#include <iostream>
 #include "stacktrace.h"
 
 #ifdef __cplusplus
@@ -24,7 +25,7 @@ int main(int argc, char** argv) {
 	try {
 		return c5_main(argc, argv);
 	} catch (StacktraceException se) {
-		se.printStackTrace();
+		std::cerr << se.what() << std::endl;
 		return -1;
 	}
 	return 0;

@@ -36,9 +36,11 @@ enum {
 	SYS2_CELL_COPY, // (int Cell) -> int. copy a cell from a pointer
 	SYS2_CELL_EMPTY,// (int Cell) -> 1 | 0. check if empty
 	SYS2_CELL_ENV_GET, // (int Cell) -> int. get pointer to cell's env
+	SYS2_CELL_FREE, // (int Cell) -> void. Free a cell object
 	SYS2_CELL_FRONT, // (int Cell) -> int. Cell
 	SYS2_CELL_LIST, // (int Cell) -> int.
 	SYS2_CELL_SIZE, // (int Cell) -> int.
+	SYS2_CELL_CSTR, // (int Cell) -> char*.
 	SYS2_CELL_TAIL, // (int Cell) -> int. List
 	SYS2_CELL_TYPE, // (int Cell) -> int. Tag
 	SYS2_CELL_VALUE,// (int Cell) -> int. Value as string
@@ -47,7 +49,6 @@ enum {
 	SYS2_LIST_FREE, // (int List) -> void.
 	SYS2_LIST_SIZE, // (int List) -> int.
 	SYS2_ENV,       // (int Outer) -> int.
-	SYS2_FREE_CELL, // (int Cell) -> void. Free a cell object
 	SYS2_FREE_ENV,  // (int Env) -> void. Free an environment object
 	SYS2_ADD_GLOBS,  // (int Env) -> void. Add global symbols to given env
 	_SYS2_END        // Must be last element
