@@ -45,8 +45,10 @@ enum {
 	SYS2_CELL_TYPE, // (int Cell) -> int. Tag
 	SYS2_CELL_VALUE,// (int Cell) -> int. Value as string
 	SYS2_LIST,      // (int Content) -> int.
+	SYS2_LIST_CSTR, // (int List) -> char*.
 	SYS2_LIST_EMPTY,// (int List) -> 1 | 0.
 	SYS2_LIST_FREE, // (int List) -> void.
+	SYS2_LIST_NEW,  // (int List|0) -> int. List
 	SYS2_LIST_SIZE, // (int List) -> int.
 	SYS2_ENV,       // (int Outer) -> int.
 	SYS2_FREE_ENV,  // (int Env) -> void. Free an environment object

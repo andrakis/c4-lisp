@@ -26,10 +26,12 @@
 #include <sstream>
 #include <bpstd/string_view.hpp>
 
+using namespace bpstd;
+
 class StacktraceException : public std::exception {
 	std::string message;
 public:
-	StacktraceException(bpstd::string_view reason) {
+	StacktraceException(string_view reason) {
 		std::stringstream ss;
 		ss << "Exception: " << reason << std::endl;
 	#if TARGET_GCC

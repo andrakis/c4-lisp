@@ -2,7 +2,24 @@
 BuildItems=@Variant(\x00\x00\x00\t\x00\x00\x00\x00\x01\x00\x00\x00\x0b\x00\x00\x00\x00\x01\x00\x00\x00\n\x00l\x00i\x00s\x00p\x004)
 
 [Cppcheck]
-extraParameters=-I non-contrib/string_view-standalone/include
+checkPerformance=true
+checkPortability=true
+extraParameters=-I %p/non-contrib/string_view-standalone/include -Wno-format -Wno-parantheses
+
+[CustomDefinesAndIncludes][ProjectPath0]
+Path=.
+parseAmbiguousAsCPP=true
+parserArguments=-ferror-limit=100 -fspell-checking -Wdocumentation -Wunused-parameter -Wunreachable-code -Wall -std=c++14
+parserArgumentsC=-ferror-limit=100 -fspell-checking -Wdocumentation -Wunused-parameter -Wunreachable-code -Wall -std=c99
+
+[CustomDefinesAndIncludes][ProjectPath0][Compiler]
+Name=GCC
+
+[CustomDefinesAndIncludes][ProjectPath0][Defines]
+CPP14=
+
+[CustomDefinesAndIncludes][ProjectPath0][Includes]
+1=/home/daedalus/NetBeansProjects/lisp4/non-contrib/string_view-standalone/include/
 
 [Filters]
 size=40
@@ -227,6 +244,9 @@ Project Target=
 Use External Terminal=false
 Working Directory=
 isExecutable=true
+
+[MakeBuilder]
+Override Number Of Jobs=true
 
 [Project]
 VersionControlSupport=kdevgit

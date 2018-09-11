@@ -15,6 +15,8 @@
 #include "stacktrace.h"
 #include "syscalls.h"
 
+using namespace bpstd; // KDevelop refuses to belief this namespace exists
+
 // Forward declarations
 struct cell;
 std::string to_string(const cell &exp);
@@ -24,8 +26,9 @@ typedef std::shared_ptr<environment> env_p;
 
 typedef std::vector<cell> cells;
 typedef cells::const_iterator cellit;
+std::string to_string(const cells &exp);
 
-NUMTYPE unhandled_event(bpstd::string_view reason);
+NUMTYPE unhandled_event(string_view reason);
 inline NUMTYPE unhandled_event(const std::stringstream &ss) {
 	return unhandled_event(ss.str());
 }
@@ -61,6 +64,7 @@ struct cell {
 	bool is_list() const { return type == List; }
 	bool is_empty() const { return is_list() ? list.empty() : true; }
 	size_t list_size() const { return is_list() ? list.size() : 0; }
+	std::string str() const { return to_string(*this); }
 };
 
 #ifdef DEBUG
@@ -120,9 +124,9 @@ NUMTYPE number_to_c(NUMTYPE v) {
 #define NUMBER_TO_C(value)      ((NUMTYPE)(value))
 #endif
 
-#define CELL(value)             (OBJ_FROM_C(cell*, value))
+#define CELL(value)             (OBJ_FROM_C(struct cell*, value))
 #define CELLS(value)            (OBJ_FROM_C(cells*, value))
-#define ENV(value)              (OBJ_FROM_C(environment*, value))
+#define ENV(value)              (OBJ_FROM_C(struct environment*, value))
 #define ENV_P(value)            (OBJ_FROM_C(env_p*, value))
 
 NUMTYPE c_cell_new(NUMTYPE tag, const char *value) {
@@ -165,14 +169,16 @@ NUMTYPE c_free_cell(NUMTYPE _cell) {
 	return 0;
 }
 
-NUMTYPE c_call_proc(NUMTYPE _cell, NUMTYPE _args) {
-	cell  *c = CELL(_cell);
+NUMTYPE c_call_proc(NUMTYPE _args, NUMTYPE _cell) {
 	cells *args = CELLS(_args);
+	cell  *c = CELL(_cell);
 	// c->proc() returns a temporary
 	cell  *result = new cell(c->proc(*args));
 	return OBJ_TO_C(result);
 }
 
+// Create a new cell of type list. Returns a cell*, not cells*
+// c_list(cell*) -> cell*;
 NUMTYPE c_list(NUMTYPE _content) {
 	cell *content = CELL(_content);
 	cell *c = new cell(List);
@@ -268,6 +274,20 @@ NUMTYPE c_env_get(const char *_name, NUMTYPE _env) {
 		return OBJ_TO_C(found);
 	}
 
+	return 0;
+}
+
+// c_env_lookup(cell*,env_p*) -> cell*;
+NUMTYPE c_env_lookup(NUMTYPE _cell, NUMTYPE _env) {
+	cell *c = CELL(_cell);
+	env_p *env = ENV_P(_env);
+	const std::string &str = c->val;
+	// UNSAFE
+	if(env->get()->has(str)) {
+		c = &env->get()->find(str)[str];
+		return OBJ_TO_C(c);
+	}
+	
 	return 0;
 }
 
@@ -374,6 +394,15 @@ cell proc_list(const cells & c)
 	return result;
 }
 
+cell proc_print(const cells &args) {
+	for(auto i = args.cbegin(); i < args.cend(); ++i) {
+		const cell &c = *i;
+		std::cout << to_string(c) << " ";
+	}
+	std::cout << std::endl;
+	return nil;
+}
+
 // define the bare minimum set of primintives necessary to pass the unit tests
 void add_globals(environment & env)
 {
@@ -385,51 +414,77 @@ void add_globals(environment & env)
 	env["-"] = cell(&proc_sub);      env["*"] = cell(&proc_mul);
 	env["/"] = cell(&proc_div);      env[">"] = cell(&proc_greater);
 	env["<"] = cell(&proc_less);     env["<="] = cell(&proc_less_equal);
+	env["print"] = cell(&proc_print);
 }
 
 NUMTYPE c_add_globals(NUMTYPE _env) {
-	env_p *env = OBJ_FROM_C(env_p*, _env);
+	env_p *env = ENV_P(_env);
 	add_globals(*env->get());
 	return OBJ_TO_C(env);
 }
 
 NUMTYPE c_cell_type(NUMTYPE _cell) {
-	cell *c = OBJ_FROM_C(cell*,_cell);
+	cell *c = CELL(_cell);
 	return NUMBER_TO_C(c->type);
 }
 
 NUMTYPE c_cell_value(NUMTYPE _cell) {
-	cell *c = OBJ_FROM_C(cell*, _cell);
+	cell *c = CELL(_cell);
 	return OBJ_TO_C((void*)c->val.c_str());
 }
 
 NUMTYPE c_cell_list(NUMTYPE _cell) {
-	cell *c = (cell*)_cell;
+	cell *c = CELL(_cell);
 	if(c->type != List)
 		return 0;
 	return (NUMTYPE)&c->list;
 }
 
-// c_cell_str(cell*) -> char*;
-// Caller is responsible for freeing the resulting string via free(3)
-NUMTYPE c_cell_cstr(const cell &c) {
-	std::stringstream ss;
-	std::string s;
+char *c_persistent_string(const std::string s) {
 	char *result;
-	
-	ss << to_string(c);
-	s = ss.str();
 	result = (char*)malloc(s.length() + 1);
 	if(!result)
 		return 0;
 	strcpy(result, s.c_str());
-	result[s.length()] = '\0'; // TODO: needed?
+	return result;
+}
+
+// c_cell_str(cell&) -> char*;
+// Caller is responsible for freeing the resulting string via free(3)
+NUMTYPE c_cell_cstr(const cell &c) {
+	std::stringstream ss;
+	char *result;
+	
+	ss << to_string(c);
+	result = c_persistent_string(ss.str());
+	return OBJ_TO_C(result);
+}
+
+NUMTYPE c_list_cstr(const cells &list) {
+	std::stringstream ss;
+	char *result;
+	
+	ss << to_string(list);
+	result = c_persistent_string(ss.str());
 	return OBJ_TO_C(result);
 }
 
 NUMTYPE c_cell_strcmp(const char *s, NUMTYPE _cell) {
 	cell *c = CELL(_cell);
 	return (c->val == s) ? 0 : 1;
+}
+
+
+// Create a new cells object. Not to be confused with c_list
+NUMTYPE c_list_new(NUMTYPE _content) {
+	cells *result;
+	if(_content) {
+		cells *content = CELLS(_content);
+		result = new cells(*content);
+	} else {
+		result = new cells();
+	}
+	return OBJ_TO_C(result);
 }
 
 NUMTYPE c_list_empty(NUMTYPE _list) {
@@ -582,17 +637,13 @@ NUMTYPE c_parse(const char *str, NUMTYPE _dest) NOEXCEPT {
 	}
 }
 
+std::string to_string(const cells &exp);
+
 // convert given cell to a Lisp-readable string
 std::string to_string(const cell & exp)
 {
-	if (exp.type == List) {
-		std::string s("(");
-		for (cell::iter e = exp.list.begin(); e != exp.list.end(); ++e)
-			s += to_string(*e) + ' ';
-		if (s[s.size() - 1] == ' ')
-			s.erase(s.size() - 1);
-		return s + ')';
-	}
+	if (exp.type == List)
+		return to_string(exp.list);
 	else if (exp.type == Lambda)
 		return "<Lambda>";
 	else if (exp.type == Proc)
@@ -600,31 +651,23 @@ std::string to_string(const cell & exp)
 	return exp.val;
 }
 
-NUMTYPE c_to_string(NUMTYPE _cell) {
-	cell *c = CELL(_cell);
-	std::string *s = new std::string(to_string(*c));
-	return (NUMTYPE)s->c_str();
-}
-
-NUMTYPE c_string_free(NUMTYPE _str) {
-	std::string *str = (std::string*)_str;
-	delete str;
-	return 0;
+std::string to_string(const cells &exp) {
+	std::string s("(");
+	for(auto i = exp.cbegin(); i < exp.cend(); ++i)
+		s += to_string(*i) + ' ';
+	if (s[s.size() - 1] == ' ')
+		s.erase(s.size() - 1);
+	return s + ')';
 }
 
 NUMTYPE c_cell_free(NUMTYPE _cell) {
-	cell *c = (cell*)_cell;
+	cell *c = CELL(_cell);
 	delete c;
 	return 0;
 }
 
-NUMTYPE unhandled_event(bpstd::string_view reason) {
-	// In case we're not in a try/catch block
-	try {
-		throw StacktraceException(reason);
-	} catch (StacktraceException se) {
-		throw;
-	}
+NUMTYPE unhandled_event(string_view reason) {
+	throw StacktraceException(reason);
 }
 
 // Syscall handlers
@@ -641,8 +684,8 @@ NUMTYPE internal_syscall1(NUMTYPE signal) {
 	return unhandled_event(ss);
 }
 NUMTYPE internal_syscall2(NUMTYPE signal, NUMTYPE arg1) {
-    cell *c;
-    cells *l;
+	cell *c;
+	cells *l;
 	environment *e;
 	env_p *ep;
 
@@ -690,16 +733,27 @@ NUMTYPE internal_syscall2(NUMTYPE signal, NUMTYPE arg1) {
             }
             break;
 		case SYS2_LIST:
+		case SYS2_LIST_NEW:
 		case SYS2_LIST_EMPTY:
 		case SYS2_LIST_SIZE:
+		case SYS2_LIST_CSTR:
+		case SYS2_LIST_FREE:
             l = CELLS(arg1);
             switch(signal) {
                 case SYS2_LIST:
 					return c_list(arg1);
+				case SYS2_LIST_NEW:
+					return c_list_new(arg1);
                 case SYS2_LIST_EMPTY:
 					return l->empty() ? 1 : 0;
                 case SYS2_LIST_SIZE:
 					return NUMBER_TO_C(l->size());
+				case SYS2_LIST_CSTR:
+					return c_list_cstr(*l);
+				case SYS2_LIST_FREE: {
+					delete l;
+					return 0;
+				}
             }
             break;
 		case SYS2_ENV:
@@ -734,9 +788,17 @@ NUMTYPE internal_syscall3(NUMTYPE signal, NUMTYPE arg1, NUMTYPE arg2) {
 		case SYS3_CELL_NEW: return c_cell_new(arg1, (const char*)arg2);
 		case SYS3_CELL_STRCMP: return c_cell_strcmp((const char*)arg1, arg2);
 		case SYS3_CELL_ENV_SET: return c_cell_env_set(arg1, arg2);
+		case SYS3_CELL_INDEX: {
+			cell *c = CELL(arg2);
+			size_t index = static_cast<size_t>(arg1);
+			if(index <= c->list_size())
+				return OBJ_TO_C(&c->list[index]);
+			return 0;
+		}
 		case SYS3_LIST_INDEX: return c_list_index(arg1, arg2);
 		case SYS3_LIST_PUSHB: return c_list_push_back(arg1, arg2);
 		case SYS3_ENV_GET: return c_env_get((const char *)arg1, arg2);
+		case SYS3_ENV_LOOKUP: return c_env_lookup(arg1, arg2);
 		case SYS3_ENV_HAS: return c_env_has((const char *)arg1, arg2);
 		case SYS3_CALL_PROC: return c_call_proc(arg1, arg2);
 		case SYS3_PARSE: return c_parse((const char*)arg1, arg2);

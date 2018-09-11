@@ -9,6 +9,8 @@
 #define SYSCALLS
 #include "syscalls.h"
 
+int debug;
+
 // enum cell_type {
 enum { Symbol, Number, List, Proc, Lambda };
 // };
@@ -43,8 +45,10 @@ enum {
 	SYS2_CELL_TYPE, // (int Cell) -> int. Tag
 	SYS2_CELL_VALUE,// (int Cell) -> int. Value as string
 	SYS2_LIST,      // (int Content) -> int.
+	SYS2_LIST_CSTR, // (int List) -> char*.
 	SYS2_LIST_EMPTY,// (int List) -> 1 | 0.
 	SYS2_LIST_FREE, // (int List) -> void.
+	SYS2_LIST_NEW,  // (int List|0) -> int. List
 	SYS2_LIST_SIZE, // (int List) -> int.
 	SYS2_ENV,       // (int Outer) -> int.
 	SYS2_FREE_ENV,  // (int Env) -> void. Free an environment object
@@ -125,6 +129,10 @@ char *cell_cstr(void *cell) {
 	return (char*)syscall2(SYS2_CELL_CSTR, (int)cell);
 }
 
+char *list_cstr(void *cells) {
+	return (char*)syscall2(SYS2_LIST_CSTR, (int)cells);
+}
+
 void *cell_index_default(int index, void *def, void *cell) {
 	if(index >= cell_size(cell))
 		return def;
@@ -156,9 +164,9 @@ int env_has(char *s, void *env) {
 	return syscall3(SYS3_ENV_HAS, (int)(void*)s, (int)env);
 }
 
-// env_lookup(char*, environment*) -> cell*();
-void *env_lookup(void *name, void *env) {
-	return (void*)syscall3(SYS3_ENV_LOOKUP, (int)name, (int)env);
+// env_lookup(cell*, environment*) -> cell*();
+void *env_lookup(void *cell, void *env) {
+	return (void*)syscall3(SYS3_ENV_LOOKUP, (int)cell, (int)env);
 }
 
 // env_new(environment*Parent) -> environment*()
@@ -190,7 +198,7 @@ void list_free(void *list) {
 }
 
 void *list_new() {
-	return (void*)syscall2(SYS2_LIST, 0);
+	return (void*)syscall2(SYS2_LIST_NEW, 0);
 }
 
 void *list_push_back(void *cell, void *list) {
@@ -205,19 +213,63 @@ int parse(char *code, void *dest) {
 	return syscall3(SYS3_PARSE, (int)code, (int)dest);
 }
 
+void print_cell(void *cell) {
+	char *str;
+
+	str = cell_cstr(cell);
+	printf("%s", str);
+	free(str);
+}
+
+void print_cells(void *cells) {
+	char *str;
+	
+	str = list_cstr(cells);
+	printf("%s", str);
+	free(str);
+}
+
 void *eval(void *x, void *env) {
 	int type, size, i;
 	void *result, *first, *test, *conseq, *alt;
 	void *proc, *exps;
+	void *t1, *t2, *t3;
+	
+	if(debug) printf("eval(%x, %x)\n", x, env);
 
 	result = 0;
 	type = cell_type(x);
-	if(type == Symbol) return env_lookup(cell_value(x), env);
-	if(type == Number) return x;
-	if(cell_empty(x)) return sym_nil;
+	if(type == Symbol) {
+		if(debug) {
+			printf("  env.lookup(");
+			print_cell(x);
+			printf(") => ");
+		}
+		x = env_lookup(x, env);
+		if(debug) {
+			print_cell(x);
+			printf("\n");
+		}
+		return x;
+	}
+	if(type == Number) {
+		if(debug) {
+			print_cell(x);
+			printf("\n");
+		}
+		return x;
+	}
+	if(cell_empty(x)) {
+		return sym_nil;
+	}
 
 	first = cell_front(x);
-	type = cell_type(cell_front(x));
+	type = cell_type(first);
+	if(debug) {
+		printf("  fn_call := ");
+		print_cell(first);
+		printf(" (...)\n");
+	}
 	if(type == Symbol) {
 		if(cell_strcmp("quote", first) == 0)			// (quote exp)
 			return cell_tail(x);
@@ -257,10 +309,31 @@ void *eval(void *x, void *env) {
 	proc = eval(first, env);
 	size = cell_size(x);
 	i = 1;
-	while(i < size)
-		exps = list_push_back(eval(cell_index(i++, x), env), exps);
+	
+	if(debug) {
+		printf("  proc, args created at %x, proc cell is: %x\n", exps, proc);
+		printf("  number args: %ld\n", size);
+	}
+	
+	while(i < size) {
+		t1 = cell_index(i++, x);
+		if(debug) {
+			printf("    arg at %ld: ", i - 1);
+			print_cell(t1);
+			printf("\n");
+		}
+		t2 = eval(t1, env);
+		if(debug) {
+			printf(" => ");
+			print_cell(t2);
+			printf("\n");
+		}
+		//exps = list_push_back(eval(cell_index(i++, x), env), exps);
+		list_push_back(t2, exps);
+	}
 	type = cell_type(proc);
 	if(type == Lambda) {
+		if(debug) printf("  proc type Lambda\n");
 		// Create new environment parented to current
 		env = env_new_args(
 			cell_index(1, proc) /* arg names list */,
@@ -272,6 +345,7 @@ void *eval(void *x, void *env) {
 		// TODO: free x
 		return result;
 	} else if(type == Proc) {
+		if(debug) printf("  proc type Proc\n");
 		result = proc_invoke(exps, proc);
 		list_free(exps);
 		// TODO: free x
@@ -284,12 +358,36 @@ void *eval(void *x, void *env) {
 
 #define main lispmain
 
-int debug;
+char *code;
+void parse_args(int argc, char **argv) {
+	while(argc > 0) {
+		if(**argv == '-') {
+			if ((*argv)[1] == 'd')
+				debug = 1;
+			else if((*argv)[1] == 'h') {
+				printf("lisp on c4\n");
+				printf("Invocation: %s [-d] [code]\n", argv[-1]);
+				printf("	-d      Enable debug mode\n");
+				printf("	code    Code to run\n");
+				exit(1);
+			} else {
+				printf("Unknown option %s, try -h\n", *argv);
+				exit(1);
+			}
+		} else {
+			// Code to run
+			code = *argv;
+			// clear argc
+			argc = 1;
+		}
+		--argc; ++argv;
+	}
+}
 
 int main(int argc, char **argv)
 {
-	void *global, *tokens;
-	char *code, *tmp;
+	void *global, *tokens, *result;
+	char *tmp;
 
 	// Ensure syscalls are up to date
 	if(!syscall_init(1, _SYS1_END) ||
@@ -300,7 +398,12 @@ int main(int argc, char **argv)
 		return -1;
 	}
 
-	debug = 1;
+	// setup globals
+	debug = 0;
+	//code = "(print (quote Hello))";
+	code = "(print (+ 1 1))";
+	--argc; ++argv;
+	parse_args(argc, argv);
 
 	// Setup predefined symbols used in eval
 	s_quote = "quote";
@@ -310,14 +413,13 @@ int main(int argc, char **argv)
 	s_lambda = "lambda";
 	s_begin = "begin";
 
-	code = "(print \"Hello!\")";
 	global = env_new(ENV_NOPARENT);
 	add_globals(global);
 	if(debug) printf(" env.global: %x\n", global);
 
 	printf("Has +: %d\n", env_has("+", global));
 	printf("Has foo: %d\n", env_has("foo", global));
-
+	
 	tokens = cell_new();
 	if(parse(code, tokens)) {
 		printf("Failed to parse code: %s\n", code);
@@ -329,7 +431,15 @@ int main(int argc, char **argv)
 		free(tmp);
 	}
 
-	//eval(tokens, global);
+	result = eval(tokens, global);
+	if(!result) {
+		printf("Failed to get result with code %s\n", code);
+	} else {
+		tmp = cell_cstr(result);
+		printf("Result: %s\n", tmp);
+		free(tmp);
+	}
+	
 
 	printf("Cleaning up\n");
 	cell_free(tokens);

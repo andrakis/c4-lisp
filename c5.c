@@ -708,7 +708,6 @@ int main(int argc, char **argv)
 	int *processes, *process, proc_max, proc_count;
 	char *pp, *tmp;
 	int i, ii, srcsize, cycle_count, exitcode;
-	int enter_lispmain;
 
 	cycle_count = 1000;
 
@@ -718,8 +717,6 @@ int main(int argc, char **argv)
 	data = 0;
 	B_MAGIC = 0xBEEF;
 	verbose = 0;
-
-	enter_lispmain = 0;
 
 	// Allocate processes
 	proc_max = 32;
@@ -753,7 +750,6 @@ int main(int argc, char **argv)
 		}
 		// -L      enter lispmain
 		else if((*argv)[1] == 'L') {
-			--argc; ++argv;
 #if 0
 			// start lisp4.c instead
 			processes[proc_count++] = (int)"lisp4.c";
