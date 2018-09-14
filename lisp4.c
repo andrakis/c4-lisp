@@ -63,7 +63,7 @@ enum {
 	SYS3_CELL_ENV_SET,// (int Env, int Cell) -> void.
 	SYS3_CELL_INDEX,  // (int Index, int Cell) -> int. Cell
 	SYS3_CELL_NEW,    // (int Tag, char *Value) -> int.
-	SYS3_CELL_RESET,  // (int Dest, int Source) -> void. Reset cell value to Source values
+	SYS3_CELL_RESET,  // (int Source, int Dest) -> void. Reset cell value to Source values
 	SYS3_CELL_SETENV, // (int Env, int Cell) -> int. Cell
 	SYS3_CELL_SETTYPE,// (int Type, int Cell) -> int. Cell
 	SYS3_CELL_STRCMP, // (char *s, int Cell) -> 0 | 1. Returns 0 on match, like strmp
@@ -158,6 +158,10 @@ int cell_type(void *cell) {
 
 char *cell_value(void *cell) {
 	return (char*)syscall2(SYS2_CELL_VALUE, (int)cell);
+}
+
+int cell_reset(void *src, void *dst) {
+	return syscall3(SYS3_CELL_RESET, (int)src, (int)dst);
 }
 
 int env_has(char *s, void *env) {
@@ -315,6 +319,7 @@ void *eval(void *x, void *env) {
 		printf("  number args: %ld\n", size);
 	}
 	
+	// Evaluate arguments
 	while(i < size) {
 		t1 = cell_index(i++, x);
 		if(debug) {
@@ -328,7 +333,6 @@ void *eval(void *x, void *env) {
 			print_cell(t2);
 			printf("\n");
 		}
-		//exps = list_push_back(eval(cell_index(i++, x), env), exps);
 		list_push_back(t2, exps);
 	}
 	type = cell_type(proc);
@@ -415,10 +419,12 @@ int main(int argc, char **argv)
 
 	global = env_new(ENV_NOPARENT);
 	add_globals(global);
-	if(debug) printf(" env.global: %x\n", global);
+	if(debug) {
+		printf(" env.global: %x\n", global);
 
-	printf("Has +: %d\n", env_has("+", global));
-	printf("Has foo: %d\n", env_has("foo", global));
+		printf("Has +: %d\n", env_has("+", global));
+		printf("Has foo: %d\n", env_has("foo", global));
+	}
 	
 	tokens = cell_new();
 	if(parse(code, tokens)) {
@@ -435,13 +441,12 @@ int main(int argc, char **argv)
 	if(!result) {
 		printf("Failed to get result with code %s\n", code);
 	} else {
-		tmp = cell_cstr(result);
-		printf("Result: %s\n", tmp);
-		free(tmp);
+		print_cell(result);
+		printf("\n");
 	}
 	
 
-	printf("Cleaning up\n");
+	if(debug) printf("Cleaning up\n");
 	cell_free(tokens);
 	env_free(global);
 	return 0;

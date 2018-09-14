@@ -804,7 +804,7 @@ int main(int argc, char **argv)
 		if(process) {
 			if(run_cycle(process, cycle_count) == 1) {
 				// Finished
-				printf("Proc %d finished: %d\n", i, process[B_exitcode]);
+				if(debug) printf("Proc %d finished: %d\n", i, process[B_exitcode]);
 				exitcode = process[B_exitcode];
 				free_process(process);
 				processes[i] = 0;

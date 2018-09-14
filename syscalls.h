@@ -63,7 +63,7 @@ enum {
 	SYS3_CELL_ENV_SET,// (int Env, int Cell) -> void.
 	SYS3_CELL_INDEX,  // (int Index, int Cell) -> int. Cell
 	SYS3_CELL_NEW,    // (int Tag, char *Value) -> int.
-	SYS3_CELL_RESET,  // (int Dest, int Source) -> void. Reset cell value to Source values
+	SYS3_CELL_RESET,  // (int Source, int Dest) -> void. Reset cell value to Source values
 	SYS3_CELL_SETENV, // (int Env, int Cell) -> int. Cell
 	SYS3_CELL_SETTYPE,// (int Type, int Cell) -> int. Cell
 	SYS3_CELL_STRCMP, // (char *s, int Cell) -> 0 | 1. Returns 0 on match, like strmp

@@ -136,11 +136,11 @@ NUMTYPE c_cell_new(NUMTYPE tag, const char *value) {
 }
 
 // Reset (copy) values from another cell
-NUMTYPE c_cell_reset(NUMTYPE dest, NUMTYPE source) {
-	cell *d = CELL(dest);
+NUMTYPE c_cell_reset(NUMTYPE source, NUMTYPE dest) {
 	cell *s = CELL(source);
+	cell *d = CELL(dest);
 	d->reset(*s);
-	return OBJ_TO_C(d);
+	return 0;
 }
 NUMTYPE c_cell_copy(NUMTYPE _cell) {
 	cell *c = CELL(_cell);
@@ -173,7 +173,8 @@ NUMTYPE c_call_proc(NUMTYPE _args, NUMTYPE _cell) {
 	cells *args = CELLS(_args);
 	cell  *c = CELL(_cell);
 	// c->proc() returns a temporary
-	cell  *result = new cell(c->proc(*args));
+	const cell &res = c->proc(*args);
+	cell  *result = new cell(res);
 	return OBJ_TO_C(result);
 }
 
@@ -795,6 +796,7 @@ NUMTYPE internal_syscall3(NUMTYPE signal, NUMTYPE arg1, NUMTYPE arg2) {
 				return OBJ_TO_C(&c->list[index]);
 			return 0;
 		}
+		case SYS3_CELL_RESET: return c_cell_reset(arg1, arg2);
 		case SYS3_LIST_INDEX: return c_list_index(arg1, arg2);
 		case SYS3_LIST_PUSHB: return c_list_push_back(arg1, arg2);
 		case SYS3_ENV_GET: return c_env_get((const char *)arg1, arg2);
