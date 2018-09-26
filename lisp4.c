@@ -98,7 +98,11 @@ char *s_quote,
      *s_false,
      *s_true;
 
-void *sym_nil;
+void *sym_nil, *sym_true, *sym_false;
+
+void *getsym_nil() { return (void*)syscall1(SYS1_ATOM_NIL); }
+void *getsym_true() { return (void*)syscall1(SYS1_ATOM_TRUE); }
+void *getsym_false() { return (void*)syscall1(SYS1_ATOM_FALSE); }
 
 void *cell_new() {
 	return (void*)syscall1(SYS1_CELL_NEW);
@@ -220,9 +224,13 @@ int parse(char *code, void *dest) {
 void print_cell(void *cell) {
 	char *str;
 
-	str = cell_cstr(cell);
-	printf("%s", str);
-	free(str);
+	if(!cell) {
+		printf("[0x0]");
+	} else {
+		str = cell_cstr(cell);
+		printf("%s", str);
+		free(str);
+	}
 }
 
 void print_cells(void *cells) {
@@ -249,12 +257,18 @@ void *eval(void *x, void *env) {
 			print_cell(x);
 			printf(") => ");
 		}
-		x = env_lookup(x, env);
+		result = env_lookup(x, env);
 		if(debug) {
-			print_cell(x);
+			print_cell(result);
 			printf("\n");
 		}
-		return x;
+		if(!result) {
+			printf("Unknown symbol: ");
+			print_cell(x);
+			printf("\n");
+			exit(1);
+		}
+		return result;
 	}
 	if(type == Number) {
 		if(debug) {
@@ -283,9 +297,21 @@ void *eval(void *x, void *env) {
 			test = cell_index(1, x);
 			conseq = cell_index(2, x);
 			alt = cell_index_default(3, sym_nil, x);
+			if(debug) {
+				printf("  !if [%x\t\t%x\t\t%x]\n", test, conseq, alt);
+				printf("      [");
+				print_cell(test); printf("\t\t");
+				print_cell(conseq); printf("\t\t");
+				print_cell(alt); printf("]\n");
+			}
 			result = eval(test, env);
+			if(debug) {
+				printf("  !ifresult: %x\n", result);
+				printf("           : ");
+				print_cell(result); printf("\n");
+				printf("  !  cell_strcmp(%x, %x)\n", s_false, result);
+			}
 			result = (cell_strcmp(s_false, result) == 0) ? alt : conseq;
-			// TODO: free x
 			return result;
 		}
 		if(cell_strcmp("set!", first) == 0) {	// (set! var exp)
@@ -348,7 +374,6 @@ void *eval(void *x, void *env) {
 		// exps no longer needed
 		list_free(exps);
 		result = eval(cell_index(2, proc), env);
-		// TODO: free x
 		return result;
 	} else if(type == Proc) {
 		if(debug) printf("  proc type Proc\n");
@@ -417,6 +442,12 @@ int main(int argc, char **argv)
 	s_define = "define";
 	s_lambda = "lambda";
 	s_begin = "begin";
+	s_false = "#f";
+	s_true = "#t";
+	
+	sym_nil = getsym_nil();
+	sym_true = getsym_true();
+	sym_false = getsym_false();
 
 	global = env_new(ENV_NOPARENT);
 	add_globals(global);
