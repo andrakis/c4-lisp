@@ -41,7 +41,6 @@ enum {
 	SYS2_CELL_LIST, // (int Cell) -> int.
 	SYS2_CELL_SIZE, // (int Cell) -> int.
 	SYS2_CELL_CSTR, // (int Cell) -> char*.
-	SYS2_CELL_TAIL, // (int Cell) -> int. List
 	SYS2_CELL_TYPE, // (int Cell) -> int. Tag
 	SYS2_CELL_VALUE,// (int Cell) -> int. Value as string
 	SYS2_LIST,      // (int Content) -> int.
@@ -67,12 +66,12 @@ enum {
 	SYS3_CELL_SETENV, // (int Env, int Cell) -> int. Cell
 	SYS3_CELL_SETTYPE,// (int Type, int Cell) -> int. Cell
 	SYS3_CELL_STRCMP, // (char *s, int Cell) -> 0 | 1. Returns 0 on match, like strmp
+	SYS3_CELL_TAIL,   // (int Cell, int Dest) -> void.
 	SYS3_LIST_INDEX,  // (int Index, int List) -> int.Cell.
 	SYS3_LIST_PUSHB,  // (int Cell, int List) -> List.
 	SYS3_ENV_GET,     // (char *Name, int Env) -> int.Cell.
 	SYS3_ENV_HAS,     // (char *Name, int Env) -> 0 | 1.
 	SYS3_ENV_LOOKUP,  // (int Cell, int Env) -> int. Cell
-	SYS3_CALL_PROC,   // (int Cells::List, int Cell) -> int. Cell.
 	SYS3_PARSE,       // (char *Code, int Cell) -> int. 0 success, 1 failure
 	SYS3_LISP_MAIN,   // (int Argc, char **Argv) -> int. Return code
 	_SYS3_END         // Must be last element
@@ -82,6 +81,7 @@ enum {
 // enum Syscalls4 {
 // syscalls that take 3 arguments (the signal, 3 args)
 enum {
+	SYS4_CALL_PROC,   // (int Cells::List, int Cell, int Dest) -> void.
 	SYS4_ENV_SET,     // (char *Name, int Cell, int Env) -> Env.
 	SYS4_ENV_NEWARGS, // (int Names::list, int Values::list, int Parent::env) -> int. Env
 	_SYS4_END        // Must be last element
@@ -143,8 +143,8 @@ int cell_strcmp(char *str, void *cell) {
 	return syscall3(SYS3_CELL_STRCMP, (int)(void*)str, (int)cell);
 }
 
-void *cell_tail(void *cell) {
-	return (void*)syscall2(SYS2_CELL_TAIL, (int)cell);
+void *cell_tail(void *cell, void *dest) {
+	return (void*)syscall3(SYS3_CELL_TAIL, (int)cell, (int)dest);
 }
 
 void *cell_set_lambda(void *env, void *cell) {
@@ -209,8 +209,8 @@ void *list_push_back(void *cell, void *list) {
 	return (void*)syscall3(SYS3_LIST_PUSHB, (int)cell, (int)list);
 }
 
-void *proc_invoke(void *exps, void *proc) {
-	return (void*)syscall3(SYS3_CALL_PROC, (int)exps, (int)proc);
+void *proc_invoke(void *exps, void *proc, void *dest) {
+	return (void*)syscall4(SYS4_CALL_PROC, (int)exps, (int)proc, (int)dest);
 }
 
 int parse(char *code, void *dest) {
@@ -275,8 +275,10 @@ void *eval(void *x, void *env) {
 		printf(" (...)\n");
 	}
 	if(type == Symbol) {
-		if(cell_strcmp("quote", first) == 0)			// (quote exp)
-			return cell_tail(x);
+		if(cell_strcmp("quote", first) == 0) {	// (quote exp)
+			cell_tail(x, x);
+			return x;
+		}
 		if(cell_strcmp("if", first) == 0) {		// (if test conseq [alt])
 			test = cell_index(1, x);
 			conseq = cell_index(2, x);
@@ -350,10 +352,9 @@ void *eval(void *x, void *env) {
 		return result;
 	} else if(type == Proc) {
 		if(debug) printf("  proc type Proc\n");
-		result = proc_invoke(exps, proc);
+		proc_invoke(exps, proc, x);
 		list_free(exps);
-		// TODO: free x
-		return result;
+		return x;
 	}
 
 	printf("Invalid call in eval\n");
@@ -405,7 +406,7 @@ int main(int argc, char **argv)
 	// setup globals
 	debug = 0;
 	//code = "(print (quote Hello))";
-	code = "(print (+ 1 1))";
+	code = "(print (quote Two plus 2 is) (+ 1 1))";
 	--argc; ++argv;
 	parse_args(argc, argv);
 

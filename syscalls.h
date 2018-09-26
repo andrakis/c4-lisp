@@ -41,7 +41,6 @@ enum {
 	SYS2_CELL_LIST, // (int Cell) -> int.
 	SYS2_CELL_SIZE, // (int Cell) -> int.
 	SYS2_CELL_CSTR, // (int Cell) -> char*.
-	SYS2_CELL_TAIL, // (int Cell) -> int. List
 	SYS2_CELL_TYPE, // (int Cell) -> int. Tag
 	SYS2_CELL_VALUE,// (int Cell) -> int. Value as string
 	SYS2_LIST,      // (int Content) -> int.
@@ -67,12 +66,12 @@ enum {
 	SYS3_CELL_SETENV, // (int Env, int Cell) -> int. Cell
 	SYS3_CELL_SETTYPE,// (int Type, int Cell) -> int. Cell
 	SYS3_CELL_STRCMP, // (char *s, int Cell) -> 0 | 1. Returns 0 on match, like strmp
+	SYS3_CELL_TAIL,   // (int Cell, int Dest) -> void.
 	SYS3_LIST_INDEX,  // (int Index, int List) -> int.Cell.
 	SYS3_LIST_PUSHB,  // (int Cell, int List) -> List.
 	SYS3_ENV_GET,     // (char *Name, int Env) -> int.Cell.
 	SYS3_ENV_HAS,     // (char *Name, int Env) -> 0 | 1.
 	SYS3_ENV_LOOKUP,  // (int Cell, int Env) -> int. Cell
-	SYS3_CALL_PROC,   // (int Cells::List, int Cell) -> int. Cell.
 	SYS3_PARSE,       // (char *Code, int Cell) -> int. 0 success, 1 failure
 	SYS3_LISP_MAIN,   // (int Argc, char **Argv) -> int. Return code
 	_SYS3_END         // Must be last element
@@ -82,6 +81,7 @@ enum {
 // enum Syscalls4 {
 // syscalls that take 3 arguments (the signal, 3 args)
 enum {
+	SYS4_CALL_PROC,   // (int Cells::List, int Cell, int Dest) -> void.
 	SYS4_ENV_SET,     // (char *Name, int Cell, int Env) -> Env.
 	SYS4_ENV_NEWARGS, // (int Names::list, int Values::list, int Parent::env) -> int. Env
 	_SYS4_END        // Must be last element

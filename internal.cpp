@@ -1,11 +1,7 @@
 #include <iostream>
 #include <list>
-#include <map>
-#include <memory>
 #include <sstream>
-#include <string>
 #include <string.h>
-#include <vector>
 
 #include <bpstd/string_view.hpp>
 
@@ -17,22 +13,10 @@
 
 using namespace bpstd; // KDevelop refuses to belief this namespace exists
 
-// Forward declarations
-struct cell;
-std::string to_string(const cell &exp);
-
-struct environment; // forward declaration; cell and environment reference each other
-typedef std::shared_ptr<environment> env_p;
-
-typedef std::vector<cell> cells;
-typedef cells::const_iterator cellit;
-std::string to_string(const cells &exp);
-
 NUMTYPE unhandled_event(string_view reason);
 inline NUMTYPE unhandled_event(const std::stringstream &ss) {
 	return unhandled_event(ss.str());
 }
-
 
 // return given mumber as a string
 std::string str(NUMTYPE n) { std::ostringstream os; os << n; return os.str(); }
@@ -40,32 +24,6 @@ const char *c_str(NUMTYPE n) { return str(n).c_str(); }
 
 // return true iff given character is '0'..'9'
 bool isdig(char c) { return isdigit(static_cast<unsigned char>(c)) != 0; }
-					// a variant that can hold any kind of lisp value
-////////////////////// cell
-
-struct cell {
-	typedef cell(*proc_type)(const std::vector<cell> &);
-	typedef std::vector<cell>::const_iterator iter;
-	typedef std::map<std::string, cell> map;
-	cell_type type;
-	std::string val;
-	std::vector<cell> list;
-	proc_type proc;
-	env_p env;
-	cell(cell_type type = Symbol) : type(type), env(0) {}
-	cell(cell_type type, const std::string & val) : type(type), val(val), env(0) {}
-	cell(proc_type proc) : type(Proc), proc(proc), env(0) {}
-	void reset(const cell &c) {
-		type = c.type;
-		val = c.val;
-		list = c.list;
-		env = c.env;
-	}
-	bool is_list() const { return type == List; }
-	bool is_empty() const { return is_list() ? list.empty() : true; }
-	size_t list_size() const { return is_list() ? list.size() : 0; }
-	std::string str() const { return to_string(*this); }
-};
 
 #ifdef DEBUG
 
@@ -169,13 +127,15 @@ NUMTYPE c_free_cell(NUMTYPE _cell) {
 	return 0;
 }
 
-NUMTYPE c_call_proc(NUMTYPE _args, NUMTYPE _cell) {
+NUMTYPE c_call_proc(NUMTYPE _args, NUMTYPE _cell, NUMTYPE _dest) {
 	cells *args = CELLS(_args);
 	cell  *c = CELL(_cell);
+	cell  *dest = CELL(_dest);
+	
 	// c->proc() returns a temporary
 	const cell &res = c->proc(*args);
-	cell  *result = new cell(res);
-	return OBJ_TO_C(result);
+	dest->reset(res);
+	return 0;
 }
 
 // Create a new cell of type list. Returns a cell*, not cells*
@@ -197,54 +157,7 @@ NUMTYPE c_list(NUMTYPE _content) {
 const cell false_sym(Symbol, "#f");
 const cell true_sym(Symbol, "#t"); // anything that isn't false_sym is true
 const cell nil(Symbol, "nil");
-
-////////////////////// environment
-
-// a dictionary that (a) associates symbols with cells, and
-// (b) can chain to an "outer" dictionary
-struct environment {
-	environment(env_p outer = 0) : outer_(outer) {}
-
-	environment(const cells & parms, const cells & args, env_p outer)
-		: outer_(outer)
-	{
-		cellit a = args.begin();
-		for (cellit p = parms.begin(); p != parms.end(); ++p)
-			env_[p->val] = *a++;
-	}
-
-	// map a variable name onto a cell
-	typedef std::map<std::string, cell> map;
-
-	// return a reference to the innermost environment where 'var' appears
-	map & find(const std::string & var)
-	{
-		if (env_.find(var) != env_.end())
-			return env_; // the symbol exists in this environment
-		if (outer_)
-			return outer_->find(var); // attempt to find the symbol in some "outer" env
-		std::cout << "unbound symbol '" << var << "'\n";
-		exit(1);
-	}
-
-	bool has(const std::string &var) const {
-		if (env_.find(var) != env_.end())
-			return true;
-		if (outer_)
-			return outer_->has(var);
-		return false;
-	}
-
-	// return a reference to the cell associated with the given symbol 'var'
-	cell & operator[] (const std::string & var)
-	{
-		return env_[var];
-	}
-
-private:
-	map env_; // inner symbol->cell mapping
-	env_p outer_; // next adjacent outer env, or 0 if there are no further environments
-};
+const cell empty_sym(List);
 
 NUMTYPE c_environment(NUMTYPE _outer) {
 	env_p *outer = ENV_P(_outer);
@@ -468,6 +381,19 @@ NUMTYPE c_list_cstr(const cells &list) {
 	ss << to_string(list);
 	result = c_persistent_string(ss.str());
 	return OBJ_TO_C(result);
+}
+
+NUMTYPE c_cell_tail(const cell &list, cell &dest) {
+	if(list.is_empty()) {
+		dest.reset(empty_sym);
+		return 0;
+	}
+	
+	const cells tl(list.list.cbegin() + 1, list.list.cend());
+	const cell tlc(tl);
+	dest.reset(tlc);
+	
+	return 0;
 }
 
 NUMTYPE c_cell_strcmp(const char *s, NUMTYPE _cell) {
@@ -796,13 +722,13 @@ NUMTYPE internal_syscall3(NUMTYPE signal, NUMTYPE arg1, NUMTYPE arg2) {
 				return OBJ_TO_C(&c->list[index]);
 			return 0;
 		}
+		case SYS3_CELL_TAIL: return c_cell_tail(*CELL(arg1), *CELL(arg2));
 		case SYS3_CELL_RESET: return c_cell_reset(arg1, arg2);
 		case SYS3_LIST_INDEX: return c_list_index(arg1, arg2);
 		case SYS3_LIST_PUSHB: return c_list_push_back(arg1, arg2);
 		case SYS3_ENV_GET: return c_env_get((const char *)arg1, arg2);
 		case SYS3_ENV_LOOKUP: return c_env_lookup(arg1, arg2);
 		case SYS3_ENV_HAS: return c_env_has((const char *)arg1, arg2);
-		case SYS3_CALL_PROC: return c_call_proc(arg1, arg2);
 		case SYS3_PARSE: return c_parse((const char*)arg1, arg2);
 		case SYS3_LISP_MAIN: return lispmain(arg1, (char**)arg2);
 	}
@@ -812,6 +738,7 @@ NUMTYPE internal_syscall3(NUMTYPE signal, NUMTYPE arg1, NUMTYPE arg2) {
 }
 NUMTYPE internal_syscall4(NUMTYPE signal, NUMTYPE arg1, NUMTYPE arg2, NUMTYPE arg3) {
 	switch(signal) {
+		case SYS4_CALL_PROC: return c_call_proc(arg1, arg2, arg3);
 		case SYS4_ENV_SET: return c_env_set((const char*)arg1, arg2, arg3);
 	}
 	std::stringstream ss;

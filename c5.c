@@ -21,10 +21,11 @@
 #include "syscalls.h"
 #include "extras.h"
 
+// Shared data (used in compilation)
 char *p, *lp, // current position in source code
      *data,   // data/bss pointer
      *opcodes;// opcodes string
-
+// Additional shared data and program flags
 int *e, *le,  // current position in emitted code
     *id,      // currently parsed identifier
     *sym,     // symbol table (simple list of identifiers)
@@ -36,6 +37,8 @@ int *e, *le,  // current position in emitted code
     src,      // print source and assembly flag
     debug,    // print executed instructions
     verbose;  // print more detailed info
+// VM symbols
+int *vm_processes, vm_proc_max, vm_proc_count, vm_cycle_count;
 
 // tokens and classes (operators last and in precedence order)
 enum {
@@ -46,10 +49,12 @@ enum {
 
 // opcodes
 enum {
+	// VM primitives
 	LEA ,IMM ,JMP ,JSR ,BZ  ,BNZ ,ENT ,ADJ ,LEV ,LI  ,LC  ,SI  ,SC  ,PSH ,
 	OR  ,XOR ,AND ,EQ  ,NE  ,LT  ,GT  ,LE  ,GE  ,SHL ,SHR ,ADD ,SUB ,MUL ,DIV ,MOD ,
-	OPEN,READ,CLOS,PRTF,MALC,FREE,MSET,MCMP,EXIT,FDSZ,
-	// Our syscalls
+	// C functions
+	OPEN,READ,CLOS,PRTF,DPRT,MALC,FREE,MSET,MCMP,EXIT,FDSZ,
+	// Extended system calls (handled externally)
 	SYS1,SYS2,SYS3,SYS4,SYSI,
 	// Pointer to last element
 	_SYMS
@@ -59,13 +64,10 @@ enum {
 void setup_opcodes() {
 	// Must be in same order as instructions enum
 	opcodes =
-		// VM primitives
 		"LEA ,IMM ,JMP ,JSR ,BZ  ,BNZ ,ENT ,ADJ ,LEV ,LI  ,LC  ,SI  ,"
 		"SC  ,PSH ,OR  ,XOR ,AND ,EQ  ,NE  ,LT  ,GT  ,LE  ,GE  ,SHL ,"
 		"SHR ,ADD ,SUB ,MUL ,DIV ,MOD ,"
-		// C functions
-		"OPEN,READ,CLOS,PRTF,MALC,FREE,MSET,MCMP,EXIT,FDSZ,"
-		// Syscalls
+		"OPEN,READ,CLOS,PRTF,DPRT,MALC,FREE,MSET,MCMP,EXIT,FDSZ,"
 		"SYS1,SYS2,SYS3,SYS4,SYSI";
 }
 
@@ -76,7 +78,7 @@ void setup_symbols() {
 		// Keywords
 		"char else enum if int return sizeof while "
 		// C functions
-		"open read close printf malloc free memset memcmp exit fdsize "
+		"open read close printf dprintf malloc free memset memcmp exit fdsize "
 		// Syscalls
 		"syscall1 syscall2 syscall3 syscall4 syscall_init "
 		// void data type
@@ -87,6 +89,9 @@ void setup_symbols() {
 
 // types
 enum { CHAR, INT, PTR };
+
+// file streams
+enum { STDIN, STDOUT, STDERR };
 
 // identifier offsets (since we can't create an ident struct)
 enum { Tk, Hash, Name, Class, Type, Val, HClass, HType, HVal, Idsz };
@@ -113,11 +118,11 @@ void next()
 		++p;
 		if (tk == '\n') {
 			if (src) {
-				printf("%d: %.*s", line, p - lp, lp);
+				dprintf(STDERR, "%d: %.*s", line, p - lp, lp);
 				lp = p;
 				while (le < e) {
-					printf("%8.4s", &opcodes[*++le * 5]);
-					if (*le <= ADJ) printf(" %d\n", *++le); else printf("\n");
+					dprintf(STDERR, "%8.4s", &opcodes[*++le * 5]);
+					if (*le <= ADJ) dprintf(STDERR, " %d\n", *++le); else dprintf(STDERR, "\n");
 				}
 			}
 			++line;
@@ -206,7 +211,7 @@ void expr(int lev)
 {
 	int t, *d;
 
-	if (!tk) { printf("%d: unexpected eof in expression\n", line); exit(-1); }
+	if (!tk) { dprintf(STDERR, "%d: unexpected eof in expression\n", line); exit(-1); }
 	else if (tk == Num) { *++e = IMM; *++e = ival; next(); ty = INT; }
 	else if (tk == '"') {
 		*++e = IMM; *++e = ival; next();
@@ -214,10 +219,10 @@ void expr(int lev)
 		data = (char *)((int)data + sizeof(int*) & -sizeof(int*)); ty = PTR;
 	}
 	else if (tk == Sizeof) {
-		next(); if (tk == '(') next(); else { printf("%d: open paren expected in sizeof\n", line); exit(-1); }
+		next(); if (tk == '(') next(); else { dprintf(STDERR, "%d: open paren expected in sizeof\n", line); exit(-1); }
 		ty = INT; if (tk == Int) next(); else if (tk == Char) { next(); ty = CHAR; }
 		while (tk == Mul) { next(); ty = ty + PTR; }
-		if (tk == ')') next(); else { printf("%d: close paren expected in sizeof\n", line); exit(-1); }
+		if (tk == ')') next(); else { dprintf(STDERR, "%d: close paren expected in sizeof\n", line); exit(-1); }
 		*++e = IMM; *++e = (ty == CHAR) ? sizeof(char) : sizeof(int*);
 		ty = INT;
 	}
@@ -230,7 +235,7 @@ void expr(int lev)
 			next();
 			if (d[Class] == Sys) *++e = d[Val];
 			else if (d[Class] == Fun) { *++e = JSR; *++e = d[Val]; }
-			else { printf("%d: bad function call\n", line); exit(-1); }
+			else { dprintf(STDERR, "%d: bad function call\n", line); exit(-1); }
 			if (t) { *++e = ADJ; *++e = t; }
 			ty = d[Type];
 		}
@@ -238,7 +243,7 @@ void expr(int lev)
 		else {
 			if (d[Class] == Loc) { *++e = LEA; *++e = loc - d[Val]; }
 			else if (d[Class] == Glo) { *++e = IMM; *++e = d[Val]; }
-			else { printf("%d: undefined variable\n", line); exit(-1); }
+			else { dprintf(STDERR, "%d: undefined variable\n", line); exit(-1); }
 			*++e = ((ty = d[Type]) == CHAR) ? LC : LI;
 		}
 	}
@@ -247,23 +252,23 @@ void expr(int lev)
 		if (tk == Int || tk == Char) {
 			t = (tk == Int) ? INT : CHAR; next();
 			while (tk == Mul) { next(); t = t + PTR; }
-			if (tk == ')') next(); else { printf("%d: bad cast\n", line); exit(-1); }
+			if (tk == ')') next(); else { dprintf(STDERR, "%d: bad cast\n", line); exit(-1); }
 			expr(Inc);
 			ty = t;
 		}
 		else {
 			expr(Assign);
-			if (tk == ')') next(); else { printf("%d: close paren expected\n", line); exit(-1); }
+			if (tk == ')') next(); else { dprintf(STDERR, "%d: close paren expected\n", line); exit(-1); }
 		}
 	}
 	else if (tk == Mul) {
 		next(); expr(Inc);
-		if (ty > INT) ty = ty - PTR; else { printf("%d: bad dereference\n", line); exit(-1); }
+		if (ty > INT) ty = ty - PTR; else { dprintf(STDERR, "%d: bad dereference\n", line); exit(-1); }
 		*++e = (ty == CHAR) ? LC : LI;
 	}
 	else if (tk == And) {
 		next(); expr(Inc);
-		if (*e == LC || *e == LI) --e; else { printf("%d: bad address-of\n", line); exit(-1); }
+		if (*e == LC || *e == LI) --e; else { dprintf(STDERR, "%d: bad address-of\n", line); exit(-1); }
 		ty = ty + PTR;
 	}
 	else if (tk == '!') { next(); expr(Inc); *++e = PSH; *++e = IMM; *++e = 0; *++e = EQ; ty = INT; }
@@ -278,26 +283,26 @@ void expr(int lev)
 		t = tk; next(); expr(Inc);
 		if (*e == LC) { *e = PSH; *++e = LC; }
 		else if (*e == LI) { *e = PSH; *++e = LI; }
-		else { printf("%d: bad lvalue in pre-increment\n", line); exit(-1); }
+		else { dprintf(STDERR, "%d: bad lvalue in pre-increment\n", line); exit(-1); }
 		*++e = PSH;
 		*++e = IMM; *++e = (ty > PTR) ? sizeof(int*) : sizeof(char);
 		*++e = (t == Inc) ? ADD : SUB;
 		*++e = (ty == CHAR) ? SC : SI;
 	}
-	else { printf("%d: bad expression\n", line); exit(-1); }
+	else { dprintf(STDERR, "%d: bad expression\n", line); exit(-1); }
 
 	while (tk >= lev) { // "precedence climbing" or "Top Down Operator Precedence" method
 		t = ty;
 		if (tk == Assign) {
 			next();
-			if (*e == LC || *e == LI) *e = PSH; else { printf("%d: bad lvalue in assignment\n", line); exit(-1); }
+			if (*e == LC || *e == LI) *e = PSH; else { dprintf(STDERR, "%d: bad lvalue in assignment\n", line); exit(-1); }
 			expr(Assign); *++e = ((ty = t) == CHAR) ? SC : SI;
 		}
 		else if (tk == Cond) {
 			next();
 			*++e = BZ; d = ++e;
 			expr(Assign);
-			if (tk == ':') next(); else { printf("%d: conditional missing colon\n", line); exit(-1); }
+			if (tk == ':') next(); else { dprintf(STDERR, "%d: conditional missing colon\n", line); exit(-1); }
 			*d = (int)(e + 3); *++e = JMP; d = ++e;
 			expr(Cond);
 			*d = (int)(e + 1);
@@ -332,7 +337,7 @@ void expr(int lev)
 		else if (tk == Inc || tk == Dec) {
 			if (*e == LC) { *e = PSH; *++e = LC; }
 			else if (*e == LI) { *e = PSH; *++e = LI; }
-			else { printf("%d: bad lvalue in post-increment\n", line); exit(-1); }
+			else { dprintf(STDERR, "%d: bad lvalue in post-increment\n", line); exit(-1); }
 			*++e = PSH; *++e = IMM; *++e = (ty > PTR) ? sizeof(int*) : sizeof(char);
 			*++e = (tk == Inc) ? ADD : SUB;
 			*++e = (ty == CHAR) ? SC : SI;
@@ -342,13 +347,13 @@ void expr(int lev)
 		}
 		else if (tk == Brak) {
 			next(); *++e = PSH; expr(Assign);
-			if (tk == ']') next(); else { printf("%d: close bracket expected\n", line); exit(-1); }
+			if (tk == ']') next(); else { dprintf(STDERR, "%d: close bracket expected\n", line); exit(-1); }
 			if (t > PTR) { *++e = PSH; *++e = IMM; *++e = sizeof(int*); *++e = MUL;	}
-			else if (t < PTR) { printf("%d: pointer type expected\n", line); exit(-1); }
+			else if (t < PTR) { dprintf(STDERR, "%d: pointer type expected\n", line); exit(-1); }
 			*++e = ADD;
 			*++e = ((ty = t - PTR) == CHAR) ? LC : LI;
 		}
-		else { printf("%d: compiler error tk=%d\n", line, tk); exit(-1); }
+		else { dprintf(STDERR, "%d: compiler error tk=%d\n", line, tk); exit(-1); }
 	}
 }
 
@@ -358,9 +363,9 @@ void stmt()
 
 	if (tk == If) {
 		next();
-		if (tk == '(') next(); else { printf("%d: open paren expected\n", line); exit(-1); }
+		if (tk == '(') next(); else { dprintf(STDERR, "%d: open paren expected\n", line); exit(-1); }
 		expr(Assign);
-		if (tk == ')') next(); else { printf("%d: close paren expected\n", line); exit(-1); }
+		if (tk == ')') next(); else { dprintf(STDERR, "%d: close paren expected\n", line); exit(-1); }
 		*++e = BZ; b = ++e;
 		stmt();
 		if (tk == Else) {
@@ -373,9 +378,9 @@ void stmt()
 	else if (tk == While) {
 		next();
 		a = e + 1;
-		if (tk == '(') next(); else { printf("%d: open paren expected\n", line); exit(-1); }
+		if (tk == '(') next(); else { dprintf(STDERR, "%d: open paren expected\n", line); exit(-1); }
 		expr(Assign);
-		if (tk == ')') next(); else { printf("%d: close paren expected\n", line); exit(-1); }
+		if (tk == ')') next(); else { dprintf(STDERR, "%d: close paren expected\n", line); exit(-1); }
 		*++e = BZ; b = ++e;
 		stmt();
 		*++e = JMP; *++e = (int)a;
@@ -385,7 +390,7 @@ void stmt()
 		next();
 		if (tk != ';') expr(Assign);
 		*++e = LEV;
-		if (tk == ';') next(); else { printf("%d: semicolon expected\n", line); exit(-1); }
+		if (tk == ';') next(); else { dprintf(STDERR, "%d: semicolon expected\n", line); exit(-1); }
 	}
 	else if (tk == '{') {
 		next();
@@ -397,7 +402,7 @@ void stmt()
 	}
 	else {
 		expr(Assign);
-		if (tk == ';') next(); else { printf("%d: semicolon expected\n", line); exit(-1); }
+		if (tk == ';') next(); else { dprintf(STDERR, "%d: semicolon expected\n", line); exit(-1); }
 	}
 }
 
@@ -407,7 +412,7 @@ int run_cycle(int *process, int cycles) {
 	int i, *t; // temps
 
 	if(process[B_magic] != B_MAGIC) {
-		printf("Invalid process magic: %d\n", process[B_magic]);
+		dprintf(STDERR, "Invalid process magic: %d\n", process[B_magic]);
 		process[B_halted] = 1;
 		process[B_exitcode] = -1;
 	}
@@ -425,8 +430,8 @@ int run_cycle(int *process, int cycles) {
 	while(--rem_cycle > 0) {
 		i = *pc++; ++cycle;
 		if (debug) {
-		  printf("%d> %.4s", cycle, &opcodes[i * 5]);
-		  if (i <= ADJ) printf(" %d\n", *pc); else printf("\n");
+		  dprintf(STDERR, "%d> %.4s", cycle, &opcodes[i * 5]);
+		  if (i <= ADJ) dprintf(STDERR, " %d\n", *pc); else dprintf(STDERR, "\n");
 		}
 		// Basic VM operations
 		if      (i == LEA) a = (int)(bp + *pc++);                             // load local address
@@ -465,12 +470,13 @@ int run_cycle(int *process, int cycles) {
 		else if (i == READ) a = read(sp[2], (char *)sp[1], *sp);
 		else if (i == CLOS) a = close(*sp);
 		else if (i == PRTF) { t = sp + pc[1]; a = printf((char *)t[-1], t[-2], t[-3], t[-4], t[-5], t[-6]); }
+		else if (i == DPRT) { t = sp + pc[1]; a = dprintf(t[-1], (char *)t[-2], t[-3], t[-4], t[-5], t[-6], t[-7]); }
 		else if (i == MALC) a = (int)malloc(*sp);
 		else if (i == FREE) free((void *)*sp);
 		else if (i == MSET) a = (int)memset((char *)sp[2], sp[1], *sp);
 		else if (i == MCMP) a = memcmp((char *)sp[2], (char *)sp[1], *sp);
 		else if (i == EXIT) {
-			if(verbose) printf("exit(%d) cycle = %d\n", *sp, cycle);
+			if(verbose) dprintf(STDERR, "exit(%d) cycle = %d\n", *sp, cycle);
 			process[B_halted] = 1;
 			process[B_exitcode] = *sp;
 			rem_cycle = 0; 
@@ -482,7 +488,7 @@ int run_cycle(int *process, int cycles) {
 		else if (i == SYSI) { a = (int)syscall_init(sp[1], *sp); }
 		else if (i == FDSZ) { a = fdsize(*sp); }
 		else {
-			printf("unknown instruction = %d! cycle = %d\n", i, cycle);
+			dprintf(STDERR, "unknown instruction = %d! cycle = %d\n", i, cycle);
 			process[B_halted] = 1;
 			process[B_exitcode] = -1;
 			rem_cycle = 0; 
@@ -505,13 +511,13 @@ int *create_process(char *source, int argc, char **argv) {
 	int *process, *idmain, poolsz;
 	poolsz = 256*1024; // arbitrary size
 
-	if (!(process = (int*)malloc(__B * sizeof(int*)))) { printf("Could not malloc(%d) process space\n", __B); return 0; }
+	if (!(process = (int*)malloc(__B * sizeof(int*)))) { dprintf(STDERR, "Could not malloc(%d) process space\n", __B); return 0; }
 
 	// Reset globals
-	if (!(sym = malloc(poolsz))) { printf("could not malloc(%d) symbol area\n", poolsz); return 0; }
-	if (!(le = e = malloc(poolsz))) { printf("could not malloc(%d) text area\n", poolsz); return 0; }
-	if (!(data = malloc(poolsz))) { printf("could not malloc(%d) data area\n", poolsz); return 0; }
-	if (!(sp = malloc(poolsz))) { printf("could not malloc(%d) stack area\n", poolsz); return 0; }
+	if (!(sym = malloc(poolsz))) { dprintf(STDERR, "could not malloc(%d) symbol area\n", poolsz); return 0; }
+	if (!(le = e = malloc(poolsz))) { dprintf(STDERR, "could not malloc(%d) text area\n", poolsz); return 0; }
+	if (!(data = malloc(poolsz))) { dprintf(STDERR, "could not malloc(%d) data area\n", poolsz); return 0; }
+	if (!(sp = malloc(poolsz))) { dprintf(STDERR, "could not malloc(%d) stack area\n", poolsz); return 0; }
 
 	process[B_p_sym] = (int)sym;
 	process[B_p_e] = (int)e;
@@ -546,11 +552,11 @@ int *create_process(char *source, int argc, char **argv) {
 				next();
 				i = 0;
 				while (tk != '}') {
-					if (tk != Id) { printf("%d: bad enum identifier %d\n", line, tk); return 0; }
+					if (tk != Id) { dprintf(STDERR, "%d: bad enum identifier %d\n", line, tk); return 0; }
 					next();
 					if (tk == Assign) {
 						next();
-						if (tk != Num) { printf("%d: bad enum initializer\n", line); return 0; }
+						if (tk != Num) { dprintf(STDERR, "%d: bad enum initializer\n", line); return 0; }
 						i = ival;
 						next();
 					}
@@ -563,8 +569,8 @@ int *create_process(char *source, int argc, char **argv) {
 		while (tk != ';' && tk != '}') {
 			ty = bt;
 			while (tk == Mul) { next(); ty = ty + PTR; }
-			if (tk != Id) { printf("%d: bad global declaration\n", line); return 0; }
-			if (id[Class]) { printf("%d: duplicate global definition for %s\n", line, id[Class]); return 0; }
+			if (tk != Id) { dprintf(STDERR, "%d: bad global declaration\n", line); return 0; }
+			if (id[Class]) { dprintf(STDERR, "%d: duplicate global definition for %s\n", line, id[Class]); return 0; }
 			next();
 			id[Type] = ty;
 			if (tk == '(') { // function
@@ -576,8 +582,8 @@ int *create_process(char *source, int argc, char **argv) {
 					if (tk == Int) next();
 					else if (tk == Char) { next(); ty = CHAR; }
 					while (tk == Mul) { next(); ty = ty + PTR; }
-					if (tk != Id) { printf("%d: bad parameter declaration\n", line); return 0; }
-					if (id[Class] == Loc) { printf("%d: duplicate parameter definition\n", line); return 0; }
+					if (tk != Id) { dprintf(STDERR, "%d: bad parameter declaration\n", line); return 0; }
+					if (id[Class] == Loc) { dprintf(STDERR, "%d: duplicate parameter definition\n", line); return 0; }
 					id[HClass] = id[Class]; id[Class] = Loc;
 					id[HType]  = id[Type];  id[Type] = ty;
 					id[HVal]   = id[Val];   id[Val] = i++;
@@ -585,7 +591,7 @@ int *create_process(char *source, int argc, char **argv) {
 					if (tk == ',') next();
 				}
 				next();
-				if (tk != '{') { printf("%d: bad function definition\n", line); return 0; }
+				if (tk != '{') { dprintf(STDERR, "%d: bad function definition\n", line); return 0; }
 				loc = ++i;
 				next();
 				while (tk == Int || tk == Char) {
@@ -594,8 +600,8 @@ int *create_process(char *source, int argc, char **argv) {
 					while (tk != ';') {
 						ty = bt;
 						while (tk == Mul) { next(); ty = ty + PTR; }
-						if (tk != Id) { printf("%d: bad local declaration\n", line); return 0; }
-						if (id[Class] == Loc) { printf("%d: duplicate local definition\n", line); return 0; }
+						if (tk != Id) { dprintf(STDERR, "%d: bad local declaration\n", line); return 0; }
+						if (id[Class] == Loc) { dprintf(STDERR, "%d: duplicate local definition\n", line); return 0; }
 						id[HClass] = id[Class]; id[Class] = Loc;
 						id[HType]  = id[Type];  id[Type] = ty;
 						id[HVal]   = id[Val];   id[Val] = ++i;
@@ -627,7 +633,7 @@ int *create_process(char *source, int argc, char **argv) {
 		next();
 	}
 
-	if (!(pc = (int *)idmain[Val])) { printf("main() not defined\n"); return 0; }
+	if (!(pc = (int *)idmain[Val])) { dprintf(STDERR, "main() not defined\n"); return 0; }
 
 	// setup stack
 	bp = sp = (int *)((int)sp + poolsz);
@@ -653,10 +659,10 @@ int *create_process(char *source, int argc, char **argv) {
 	free((void*)process[B_p_sym]);
 
 	if(verbose) {
-		printf("Process image information:\n");
-		printf("  Emitted code size: %d\n", (int)(e - process[B_p_e]));
-		printf("  Emitted data size: %d\n", (int)(data - process[B_p_data]));
-		printf("  main() entry point: %d\n", (int)pc);
+		dprintf(STDERR, "Process image information:\n");
+		dprintf(STDERR, "  Emitted code size: %d\n", (int)(e - process[B_p_e]));
+		dprintf(STDERR, "  Emitted data size: %d\n", (int)(data - process[B_p_data]));
+		dprintf(STDERR, "  main() entry point: %d\n", (int)pc);
 	}
 
 	process[B_magic] = B_MAGIC;
@@ -694,7 +700,7 @@ enum { SYS3_LISP_MAIN };
 
 int c5_lispmain(int argc, char **argv) {
 #if 0
-	printf("Indirect call to c5_lispmain not supported\n");
+	dprintf(STDERR, "Indirect call to c5_lispmain not supported\n");
 	return 1;
 #endif
 	return syscall3(SYS3_LISP_MAIN, argc, (int)argv);
@@ -705,11 +711,11 @@ int c5_lispmain(int argc, char **argv) {
 int main(int argc, char **argv)
 {
 	int fd;
-	int *processes, *process, proc_max, proc_count;
 	char *pp, *tmp;
-	int i, ii, srcsize, cycle_count, exitcode;
+	int *process;
+	int i, ii, srcsize, exitcode;
 
-	cycle_count = 1000;
+	vm_cycle_count = 1000;
 
 	// Set globals
 	setup_opcodes();
@@ -718,11 +724,11 @@ int main(int argc, char **argv)
 	B_MAGIC = 0xBEEF;
 	verbose = 0;
 
-	// Allocate processes
-	proc_max = 32;
-	proc_count = 0;
-	if (!(processes = (int*)malloc(proc_max * sizeof(int*)))) { printf("Failed to allocate processes area\n"); return -1; }
-	memset(processes, 0, proc_max * sizeof(int*));
+	// Allocate vm_processes
+	vm_proc_max = 32;
+	vm_proc_count = 0;
+	if (!(vm_processes = (int*)malloc(vm_proc_max * sizeof(int*)))) { dprintf(STDERR, "Failed to allocate vm_processes area\n"); return -1; }
+	memset(vm_processes, 0, vm_proc_max * sizeof(int*));
 
 	--argc; ++argv;
 	i = 0; // when to exit parameter parsing
@@ -735,27 +741,27 @@ int main(int argc, char **argv)
 		else if ((*argv)[1] == 'c') {
 			--argc; ++argv;
 			// inline atoi
-			cycle_count = 0;
+			vm_cycle_count = 0;
 			pp = *argv;
 			while(*pp != 0) {
-				cycle_count = cycle_count * 10 + (*pp++ - '0');
+				vm_cycle_count = vm_cycle_count * 10 + (*pp++ - '0');
 			}
-			printf("Cycle count set to %i\n", cycle_count);
+			dprintf(STDERR, "Cycle count set to %i\n", vm_cycle_count);
 		}
 		// -r xyz  start additional process
 		else if((*argv)[1] == 'r') {
 			--argc; ++argv;
-			processes[proc_count++] = (int)*argv;
+			vm_processes[vm_proc_count++] = (int)*argv;
 			--argc; ++argv;
 		}
 		// -L      enter lispmain
 		else if((*argv)[1] == 'L') {
 #if 0
 			// start lisp4.c instead
-			processes[proc_count++] = (int)"lisp4.c";
+			vm_processes[vm_proc_count++] = (int)"lisp4.c";
 			if(0) // Dummy out the next call
 #else
-				free(processes);
+				free(vm_processes);
 #if 0
 			if(0) // Dummy out the next call
 #endif
@@ -767,55 +773,55 @@ int main(int argc, char **argv)
 		// --      end parameter passing
 		else if((*argv)[1] == '-') { i = 1; }
 		else {
-			printf("Invalid argument: %s\n", *argv);
-			free(processes);
+			dprintf(STDERR, "Invalid argument: %s\n", *argv);
+			free(vm_processes);
 			return -1;
 		}
 		--argc; ++argv;
 	}
-	if (proc_count < 1 && argc < 1) { free(processes); printf("usage: c5 [-L] [-s] [-d] [-v] [-c nnn] [-r file] file args...\n"); return -1; }
-	if (argc > 0) processes[proc_count++] = (int)*argv;
+	if (vm_proc_count < 1 && argc < 1) { free(vm_processes); dprintf(STDERR, "usage: c5 [-L] [-s] [-d] [-v] [-c nnn] [-r file] file args...\n"); return -1; }
+	if (argc > 0) vm_processes[vm_proc_count++] = (int)*argv;
 
-	// Start all processes
+	// Start all vm_processes
 	i = 0;
-	while(i < proc_count) {
-		tmp = (char*)processes[i];
-		if (verbose) printf("->Start process: %s\n", tmp);
+	while(i < vm_proc_count) {
+		tmp = (char*)vm_processes[i];
+		if (verbose) dprintf(STDERR, "->Start process: %s\n", tmp);
 		if ((fd = open(tmp, 0)) < 0) {
-			printf("could not open(%s), ensure options are before filename\n", tmp); return -1;
+			dprintf(STDERR, "could not open(%s), ensure options are before filename\n", tmp); return -1;
 		}
 		srcsize = fdsize(fd) + 1;
 
-		if (!(p = pp = malloc(srcsize))) { printf("could not malloc(%d) source area\n", srcsize); return -1; }
-		if ((ii = read(fd, p, srcsize)) <= 0) { printf("read() returned %d\n", i); return -1; }
+		if (!(p = pp = malloc(srcsize))) { dprintf(STDERR, "could not malloc(%d) source area\n", srcsize); return -1; }
+		if ((ii = read(fd, p, srcsize)) <= 0) { dprintf(STDERR, "read() returned %d\n", i); return -1; }
 		p[ii] = 0;
 		close(fd);
 		process = create_process(p, argc, argv);
 		free((void*)pp);
-		if(process == 0) { printf("Invalid process\n"); return -1; }
-		processes[i++] = (int)process;
+		if(process == 0) { dprintf(STDERR, "Invalid process\n"); return -1; }
+		vm_processes[i++] = (int)process;
 	}
 
 	// run...
 	i = 0;
 	exitcode = 0;
-	while(proc_count > 0) {
-		process = (int*)processes[i];
+	while(vm_proc_count > 0) {
+		process = (int*)vm_processes[i];
 		if(process) {
-			if(run_cycle(process, cycle_count) == 1) {
+			if(run_cycle(process, vm_cycle_count) == 1) {
 				// Finished
-				if(debug) printf("Proc %d finished: %d\n", i, process[B_exitcode]);
+				if(debug) dprintf(STDERR, "Proc %d finished: %d\n", i, process[B_exitcode]);
 				exitcode = process[B_exitcode];
 				free_process(process);
-				processes[i] = 0;
-				--proc_count;
+				vm_processes[i] = 0;
+				--vm_proc_count;
 			}
 		}
 		++i;
-		if(i == proc_max) i = 0;
+		if(i == vm_proc_max) i = 0;
 	}
 
-	free((void*)processes);
+	free((void*)vm_processes);
 
 	return exitcode;
 }

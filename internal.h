@@ -2,9 +2,102 @@
 #define __INTERNAL_H
 
 #include "native.h"
+#include "cell.h"
 
 #ifdef __cplusplus
+#include <map>
+#include <memory>
+#include <string>
+#include <vector>
+
+// Forward declarations
+struct cell;
+std::string to_string(const cell &exp);
+
+struct environment; // forward declaration; cell and environment reference each other
+typedef std::shared_ptr<environment> env_p;
+
+typedef std::vector<cell> cells;
+typedef cells::const_iterator cellit;
+std::string to_string(const cells &exp);
+
+// a variant that can hold any kind of lisp value
+////////////////////// cell
+struct cell {
+	typedef cell(*proc_type)(const std::vector<cell> &);
+	typedef std::vector<cell>::const_iterator iter;
+	typedef std::map<std::string, cell> map;
+	cell_type type;
+	std::string val;
+	cells list;
+	proc_type proc;
+	env_p env;
+	cell(cell_type type = Symbol) : type(type), val(""), list(), env(0) {}
+	cell(cell_type type, const std::string & val) : type(type), val(val), list(), env(0) {}
+	cell(const cells &lst) : type(List), val(""), list(lst), env(0) {}
+	cell(proc_type proc) : type(Proc), proc(proc), env(0) {}
+	void reset(const cell &c) {
+		type = c.type;
+		val = c.val;
+		list = c.list;
+		env = c.env;
+	}
+	bool is_list() const { return type == List; }
+	bool is_empty() const { return is_list() ? list.empty() : true; }
+	size_t list_size() const { return is_list() ? list.size() : 0; }
+	std::string str() const { return to_string(*this); }
+};
+
+////////////////////// environment
+
+// a dictionary that (a) associates symbols with cells, and
+// (b) can chain to an "outer" dictionary
+struct environment {
+	environment(env_p outer = 0) : outer_(outer) {}
+
+	environment(const cells & parms, const cells & args, env_p outer)
+		: outer_(outer)
+	{
+		cellit a = args.begin();
+		for (cellit p = parms.begin(); p != parms.end(); ++p)
+			env_[p->val] = *a++;
+	}
+
+	// map a variable name onto a cell
+	typedef std::map<std::string, cell> map;
+
+	// return a reference to the innermost environment where 'var' appears
+	map & find(const std::string & var)
+	{
+		if (env_.find(var) != env_.end())
+			return env_; // the symbol exists in this environment
+		if (outer_)
+			return outer_->find(var); // attempt to find the symbol in some "outer" env
+		std::cout << "unbound symbol '" << var << "'\n";
+		exit(1);
+	}
+
+	bool has(const std::string &var) const {
+		if (env_.find(var) != env_.end())
+			return true;
+		if (outer_)
+			return outer_->has(var);
+		return false;
+	}
+
+	// return a reference to the cell associated with the given symbol 'var'
+	cell & operator[] (const std::string & var)
+	{
+		return env_[var];
+	}
+
+private:
+	map env_; // inner symbol->cell mapping
+	env_p outer_; // next adjacent outer env, or 0 if there are no further environments
+};
+
 extern "C" {
+	
 #endif
 
 const char *c_str(NUMTYPE cell);
