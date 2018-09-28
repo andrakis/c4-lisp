@@ -11,9 +11,9 @@
 #include "native.h"
 
 #if TARGET_WIN
-#elif TARGET_GCC
+#elif TARGET_GLIBC
 	#include <execinfo.h>
-#endif /* TARGET_WIN | TARGET_GCC */
+#endif /* TARGET_WIN | TARGET_GLIBC */
 
 /* Maximum depth of stacktrace */
 #ifndef STACKTRACE_MAXDEPTH
@@ -34,7 +34,7 @@ public:
 	StacktraceException(string_view reason) {
 		std::stringstream ss;
 		ss << "Exception: " << reason << std::endl;
-	#if TARGET_GCC
+	#if TARGET_GLIBC
 		int frames;
 		void *callstack[STACKTRACE_MAXDEPTH];
 		frames = backtrace(callstack, STACKTRACE_MAXDEPTH);
@@ -43,7 +43,7 @@ public:
 		for(int i = 0; i < frames; ++i) {
 			ss << symbols[i] << std::endl;
 		}
-	#elif TARGET_WIN
+	#else
 		ss << "Stack trace unavailable on this platform." << std::endl;
 	#endif
 		message = ss.str();

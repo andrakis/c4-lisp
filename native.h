@@ -5,6 +5,7 @@
  *   NUMTYPE   : appropriate number type (int or long) depending on above
  *   TARGET_WIN: compiling for windows
  *   TARGET_GCC: compiling with gcc
+ *   TARGET_GLIBC: compiling for glibc (not all Linux platforms use it)
  *   NOEXCEPT  : on C: (empty), on C++: noexcept
  * These allow for platform handling behaviour based on compiler.
  * 
@@ -75,6 +76,10 @@
 #elif __ANDROID__
 	#define TARGET_GCC 1
 	#define TARGET_ANDROID 1
+#elif __GLIBC__
+	#define TARGET_GCC 1
+	#define TARGET_GLIBC 1
+	#define TARGET_LINUX 1
 #elif __linux
     /* linux */
 	#define TARGET_GCC 1
