@@ -6,11 +6,10 @@
 #include <stdexcept> // for string_view on GCC < 5
 #include <bpstd/string_view.hpp>
 
-#include "native.h"
-#include "internal.h"
-#include "cell.h"
-#include "stacktrace.h"
-#include "syscalls.h"
+#include "core/native.h"
+#include "core/stacktrace.h"
+#include "core/syscalls.h"
+#include "platform/scheme/scheme.h"
 
 using namespace bpstd; // KDevelop refuses to belief this namespace exists
 

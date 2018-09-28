@@ -11,8 +11,8 @@
  * Created on 21 August 2018, 10:13 PM
  */
 
-#ifndef CELL_H
-#define CELL_H
+#ifndef PLATFORM_SCHEME_CELL_H
+#define PLATFORM_SCHEME_CELL_H
 
 #ifdef __cplusplus
 extern "C" {
@@ -26,5 +26,5 @@ enum cell_type { Symbol, Number, List, Proc, Lambda };
 }
 #endif
 
-#endif /* CELL_H */
+#endif /* PLATFORM_SCHEME_CELL_H */
 

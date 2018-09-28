@@ -1,10 +1,10 @@
 //
 #include <stdlib.h>
 #include <stdio.h>
-#include "native.h"
-#include "syscalls.h"
-#include "internal.h"
-#include "cell.h"
+
+#include "core/native.h"
+#include "core/syscalls.h"
+#include "platform/scheme/scheme.h"
 
 #ifndef NUMTYPE
 #define NUMTYPE long

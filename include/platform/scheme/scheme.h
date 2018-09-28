@@ -1,8 +1,8 @@
-#ifndef __INTERNAL_H
-#define __INTERNAL_H
+#ifndef __PLATFORM_SCHEME_H
+#define __PLATFORM_SCHEME_H
 
-#include "native.h"
-#include "cell.h"
+#include "core/native.h"
+#include "platform/scheme/cell.h"
 
 #ifdef __cplusplus
 #include <map>

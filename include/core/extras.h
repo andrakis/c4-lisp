@@ -1,7 +1,7 @@
 #ifndef _EXTRAS_H
 #define _EXTRAS_H
 
-#include "native.h"
+#include "core/native.h"
 
 #ifdef __cplusplus
 extern "C" {

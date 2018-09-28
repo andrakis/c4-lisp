@@ -35,12 +35,12 @@ OBJECTDIR=${CND_BUILDDIR}/${CND_CONF}/${CND_PLATFORM}
 
 # Object Files
 OBJECTFILES= \
-	${OBJECTDIR}/c5.o \
-	${OBJECTDIR}/extras.o \
-	${OBJECTDIR}/internal.o \
-	${OBJECTDIR}/lisp4.o \
-	${OBJECTDIR}/main.o \
-	${OBJECTDIR}/syscalls.o
+	${OBJECTDIR}/core/c4.o \
+	${OBJECTDIR}/core/extras.o \
+	${OBJECTDIR}/core/main.o \
+	${OBJECTDIR}/core/syscalls.o \
+	${OBJECTDIR}/platform/scheme/scheme.o \
+	${OBJECTDIR}/platform/scheme/scheme_internal.o
 
 
 # C Compiler Flags
@@ -67,35 +67,35 @@ ${CND_DISTDIR}/${CND_CONF}/${CND_PLATFORM}/lisp4: ${OBJECTFILES}
 	${MKDIR} -p ${CND_DISTDIR}/${CND_CONF}/${CND_PLATFORM}
 	${LINK.cc} -o ${CND_DISTDIR}/${CND_CONF}/${CND_PLATFORM}/lisp4 ${OBJECTFILES} ${LDLIBSOPTIONS}
 
-${OBJECTDIR}/c5.o: c5.c 
-	${MKDIR} -p ${OBJECTDIR}
+${OBJECTDIR}/core/c4.o: core/c4.c 
+	${MKDIR} -p ${OBJECTDIR}/core
 	${RM} "$@.d"
-	$(COMPILE.c) -O2 -DNDEBUG -DRELEASE -I. -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/c5.o c5.c
+	$(COMPILE.c) -O2 -DNDEBUG -DRELEASE -Iinclude -Inon-contrib/string_view-standalone/include -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/core/c4.o core/c4.c
 
-${OBJECTDIR}/extras.o: extras.c 
-	${MKDIR} -p ${OBJECTDIR}
+${OBJECTDIR}/core/extras.o: core/extras.c 
+	${MKDIR} -p ${OBJECTDIR}/core
 	${RM} "$@.d"
-	$(COMPILE.c) -O2 -DNDEBUG -DRELEASE -I. -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/extras.o extras.c
+	$(COMPILE.c) -O2 -DNDEBUG -DRELEASE -Iinclude -Inon-contrib/string_view-standalone/include -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/core/extras.o core/extras.c
 
-${OBJECTDIR}/internal.o: internal.cpp 
-	${MKDIR} -p ${OBJECTDIR}
+${OBJECTDIR}/core/main.o: core/main.cpp 
+	${MKDIR} -p ${OBJECTDIR}/core
 	${RM} "$@.d"
-	$(COMPILE.cc) -O2 -DCPP14 -DNDEBUG -DRELEASE -I. -I./non-contrib/string_view-standalone/include -std=c++14 -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/internal.o internal.cpp
+	$(COMPILE.cc) -O2 -DCPP14 -DNDEBUG -DRELEASE -Iinclude -Inon-contrib/string_view-standalone/include -std=c++14 -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/core/main.o core/main.cpp
 
-${OBJECTDIR}/lisp4.o: lisp4.c 
-	${MKDIR} -p ${OBJECTDIR}
+${OBJECTDIR}/core/syscalls.o: core/syscalls.c 
+	${MKDIR} -p ${OBJECTDIR}/core
 	${RM} "$@.d"
-	$(COMPILE.c) -O2 -DNDEBUG -DRELEASE -I. -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/lisp4.o lisp4.c
+	$(COMPILE.c) -O2 -DNDEBUG -DRELEASE -Iinclude -Inon-contrib/string_view-standalone/include -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/core/syscalls.o core/syscalls.c
 
-${OBJECTDIR}/main.o: main.cpp 
-	${MKDIR} -p ${OBJECTDIR}
+${OBJECTDIR}/platform/scheme/scheme.o: platform/scheme/scheme.c 
+	${MKDIR} -p ${OBJECTDIR}/platform/scheme
 	${RM} "$@.d"
-	$(COMPILE.cc) -O2 -DCPP14 -DNDEBUG -DRELEASE -I. -I./non-contrib/string_view-standalone/include -std=c++14 -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/main.o main.cpp
+	$(COMPILE.c) -O2 -DNDEBUG -DRELEASE -Iinclude -Inon-contrib/string_view-standalone/include -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/platform/scheme/scheme.o platform/scheme/scheme.c
 
-${OBJECTDIR}/syscalls.o: syscalls.c 
-	${MKDIR} -p ${OBJECTDIR}
+${OBJECTDIR}/platform/scheme/scheme_internal.o: platform/scheme/scheme_internal.cpp 
+	${MKDIR} -p ${OBJECTDIR}/platform/scheme
 	${RM} "$@.d"
-	$(COMPILE.c) -O2 -DNDEBUG -DRELEASE -I. -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/syscalls.o syscalls.c
+	$(COMPILE.cc) -O2 -DCPP14 -DNDEBUG -DRELEASE -Iinclude -Inon-contrib/string_view-standalone/include -std=c++14 -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/platform/scheme/scheme_internal.o platform/scheme/scheme_internal.cpp
 
 # Subprojects
 .build-subprojects:

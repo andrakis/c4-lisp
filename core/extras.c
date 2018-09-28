@@ -1,7 +1,7 @@
 // Extra functions for interpreter
 
 #include <sys/stat.h>
-#include "native.h"
+#include "core/native.h"
 
 NUMTYPE fdsize (int fd) {
 	struct stat st;

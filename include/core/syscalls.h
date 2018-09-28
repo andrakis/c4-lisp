@@ -1,7 +1,7 @@
 #ifndef __SYSCALLS
 #define __SYSCALLS
 
-#include "native.h"
+#include "core/native.h"
 
 #ifdef __cplusplus
 extern "C" {

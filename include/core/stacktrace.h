@@ -8,7 +8,7 @@
 #ifndef STACKTRACE_H
 #define STACKTRACE_H
 
-#include "native.h"
+#include "core/native.h"
 
 #if TARGET_WIN
 #elif TARGET_GLIBC
@@ -24,6 +24,7 @@
 #include <exception>
 #include <memory>
 #include <sstream>
+#include <stdexcept> // For string_view
 #include <bpstd/string_view.hpp>
 
 using namespace bpstd;

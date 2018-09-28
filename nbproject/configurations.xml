@@ -4,13 +4,19 @@
     <logicalFolder name="HeaderFiles"
                    displayName="Header Files"
                    projectFiles="true">
-      <itemPath>c5_native.h</itemPath>
-      <itemPath>cell.h</itemPath>
-      <itemPath>extras.h</itemPath>
-      <itemPath>internal.h</itemPath>
-      <itemPath>native.h</itemPath>
-      <itemPath>stacktrace.h</itemPath>
-      <itemPath>syscalls.h</itemPath>
+      <logicalFolder name="core" displayName="core" projectFiles="true">
+        <itemPath>include/core/c5_native.h</itemPath>
+        <itemPath>include/core/extras.h</itemPath>
+        <itemPath>include/core/native.h</itemPath>
+        <itemPath>include/core/stacktrace.h</itemPath>
+        <itemPath>include/core/syscalls.h</itemPath>
+      </logicalFolder>
+      <logicalFolder name="platform" displayName="platform" projectFiles="true">
+        <logicalFolder name="scheme" displayName="scheme" projectFiles="true">
+          <itemPath>include/platform/scheme/cell.h</itemPath>
+          <itemPath>include/platform/scheme/scheme.h</itemPath>
+        </logicalFolder>
+      </logicalFolder>
     </logicalFolder>
     <logicalFolder name="ResourceFiles"
                    displayName="Resource Files"
@@ -19,14 +25,18 @@
     <logicalFolder name="SourceFiles"
                    displayName="Source Files"
                    projectFiles="true">
+      <logicalFolder name="core" displayName="core" projectFiles="true">
+        <itemPath>core/c4.c</itemPath>
+        <itemPath>core/extras.c</itemPath>
+        <itemPath>core/main.cpp</itemPath>
+        <itemPath>core/syscalls.c</itemPath>
+      </logicalFolder>
+      <logicalFolder name="scheme" displayName="scheme" projectFiles="true">
+        <itemPath>platform/scheme/scheme.c</itemPath>
+        <itemPath>platform/scheme/scheme_internal.cpp</itemPath>
+      </logicalFolder>
       <itemPath>LICENSE</itemPath>
       <itemPath>Makefile</itemPath>
-      <itemPath>c5.c</itemPath>
-      <itemPath>extras.c</itemPath>
-      <itemPath>internal.cpp</itemPath>
-      <itemPath>lisp4.c</itemPath>
-      <itemPath>main.cpp</itemPath>
-      <itemPath>syscalls.c</itemPath>
     </logicalFolder>
     <logicalFolder name="TestFiles"
                    displayName="Test Files"
@@ -54,7 +64,8 @@
       <compileType>
         <cTool>
           <incDir>
-            <pElem>.</pElem>
+            <pElem>include</pElem>
+            <pElem>non-contrib/string_view-standalone/include</pElem>
           </incDir>
           <commandLine>-Wno-format -rdynamic</commandLine>
           <preprocessorList>
@@ -65,8 +76,8 @@
         <ccTool>
           <standard>11</standard>
           <incDir>
-            <pElem>.</pElem>
-            <pElem>./non-contrib/string_view-standalone/include</pElem>
+            <pElem>include</pElem>
+            <pElem>non-contrib/string_view-standalone/include</pElem>
           </incDir>
           <commandLine>-Wno-format -rdynamic -Wall -Werror</commandLine>
           <preprocessorList>
@@ -80,31 +91,34 @@
       </item>
       <item path="Makefile" ex="false" tool="3" flavor2="0">
       </item>
-      <item path="c5.c" ex="false" tool="0" flavor2="0">
+      <item path="core/c4.c" ex="false" tool="0" flavor2="0">
       </item>
-      <item path="c5_native.h" ex="false" tool="3" flavor2="0">
+      <item path="core/extras.c" ex="false" tool="0" flavor2="0">
       </item>
-      <item path="cell.h" ex="false" tool="3" flavor2="0">
+      <item path="core/main.cpp" ex="false" tool="1" flavor2="0">
       </item>
-      <item path="extras.c" ex="false" tool="0" flavor2="0">
+      <item path="core/syscalls.c" ex="false" tool="0" flavor2="0">
       </item>
-      <item path="extras.h" ex="false" tool="3" flavor2="0">
+      <item path="include/core/c5_native.h" ex="false" tool="3" flavor2="0">
       </item>
-      <item path="internal.cpp" ex="false" tool="1" flavor2="0">
+      <item path="include/core/extras.h" ex="false" tool="3" flavor2="0">
       </item>
-      <item path="internal.h" ex="false" tool="3" flavor2="0">
+      <item path="include/core/native.h" ex="false" tool="3" flavor2="0">
       </item>
-      <item path="lisp4.c" ex="false" tool="0" flavor2="0">
+      <item path="include/core/stacktrace.h" ex="false" tool="3" flavor2="0">
       </item>
-      <item path="main.cpp" ex="false" tool="1" flavor2="0">
+      <item path="include/core/syscalls.h" ex="false" tool="3" flavor2="0">
       </item>
-      <item path="native.h" ex="false" tool="3" flavor2="0">
+      <item path="include/platform/scheme/cell.h" ex="false" tool="3" flavor2="0">
       </item>
-      <item path="stacktrace.h" ex="false" tool="3" flavor2="0">
+      <item path="include/platform/scheme/scheme.h" ex="false" tool="3" flavor2="0">
       </item>
-      <item path="syscalls.c" ex="false" tool="0" flavor2="0">
+      <item path="platform/scheme/scheme.c" ex="false" tool="0" flavor2="0">
       </item>
-      <item path="syscalls.h" ex="false" tool="3" flavor2="0">
+      <item path="platform/scheme/scheme_internal.cpp"
+            ex="false"
+            tool="1"
+            flavor2="0">
       </item>
     </conf>
     <conf name="Release" type="1">
@@ -117,7 +131,8 @@
         <cTool>
           <developmentMode>5</developmentMode>
           <incDir>
-            <pElem>.</pElem>
+            <pElem>include</pElem>
+            <pElem>non-contrib/string_view-standalone/include</pElem>
           </incDir>
           <commandLine>-Wno-format</commandLine>
           <preprocessorList>
@@ -129,8 +144,8 @@
           <developmentMode>5</developmentMode>
           <standard>11</standard>
           <incDir>
-            <pElem>.</pElem>
-            <pElem>./non-contrib/string_view-standalone/include</pElem>
+            <pElem>include</pElem>
+            <pElem>non-contrib/string_view-standalone/include</pElem>
           </incDir>
           <commandLine>-Wno-format</commandLine>
           <preprocessorList>
@@ -150,31 +165,34 @@
       </item>
       <item path="Makefile" ex="false" tool="3" flavor2="0">
       </item>
-      <item path="c5.c" ex="false" tool="0" flavor2="0">
+      <item path="core/c4.c" ex="false" tool="0" flavor2="0">
       </item>
-      <item path="c5_native.h" ex="false" tool="3" flavor2="0">
+      <item path="core/extras.c" ex="false" tool="0" flavor2="0">
       </item>
-      <item path="cell.h" ex="false" tool="3" flavor2="0">
+      <item path="core/main.cpp" ex="false" tool="1" flavor2="0">
       </item>
-      <item path="extras.c" ex="false" tool="0" flavor2="0">
+      <item path="core/syscalls.c" ex="false" tool="0" flavor2="0">
       </item>
-      <item path="extras.h" ex="false" tool="3" flavor2="0">
+      <item path="include/core/c5_native.h" ex="false" tool="3" flavor2="0">
       </item>
-      <item path="internal.cpp" ex="false" tool="1" flavor2="0">
+      <item path="include/core/extras.h" ex="false" tool="3" flavor2="0">
       </item>
-      <item path="internal.h" ex="false" tool="3" flavor2="0">
+      <item path="include/core/native.h" ex="false" tool="3" flavor2="0">
       </item>
-      <item path="lisp4.c" ex="false" tool="0" flavor2="0">
+      <item path="include/core/stacktrace.h" ex="false" tool="3" flavor2="0">
       </item>
-      <item path="main.cpp" ex="false" tool="1" flavor2="0">
+      <item path="include/core/syscalls.h" ex="false" tool="3" flavor2="0">
       </item>
-      <item path="native.h" ex="false" tool="3" flavor2="0">
+      <item path="include/platform/scheme/cell.h" ex="false" tool="3" flavor2="0">
       </item>
-      <item path="stacktrace.h" ex="false" tool="3" flavor2="0">
+      <item path="include/platform/scheme/scheme.h" ex="false" tool="3" flavor2="0">
       </item>
-      <item path="syscalls.c" ex="false" tool="0" flavor2="0">
+      <item path="platform/scheme/scheme.c" ex="false" tool="0" flavor2="0">
       </item>
-      <item path="syscalls.h" ex="false" tool="3" flavor2="0">
+      <item path="platform/scheme/scheme_internal.cpp"
+            ex="false"
+            tool="1"
+            flavor2="0">
       </item>
     </conf>
   </confs>

@@ -4,10 +4,10 @@
 #include <unistd.h>
 #include <fcntl.h>
 
-#include "c5_native.h"
+#include "core/c5_native.h"
 
 #define SYSCALLS
-#include "syscalls.h"
+#include "core/syscalls.h"
 
 int debug;
 

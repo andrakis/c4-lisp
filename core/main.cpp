@@ -6,7 +6,7 @@
  */
 
 #include <iostream>
-#include "stacktrace.h"
+#include "core/stacktrace.h"
 
 #ifdef __cplusplus
 extern "C" {

@@ -17,9 +17,9 @@
 #include <unistd.h>
 #include <fcntl.h>
 
-#include "c5_native.h"
-#include "syscalls.h"
-#include "extras.h"
+#include "core/c5_native.h"
+#include "core/syscalls.h"
+#include "core/extras.h"
 
 // Shared data (used in compilation)
 char *p, *lp, // current position in source code
