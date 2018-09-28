@@ -3,6 +3,8 @@ C4-Lisp
 
 An experiment on the [C4](https://github.com/rswier/c4) self-hosting C virtual machine.
 
+This might better be known as a Scheme interpreter, but the author isn't sure on the correct terminology.
+
 New opcodes are added:
 
 * SYS1, SYS2, SYS3, SYS4: Calls functions in internal.cpp, which implement the behind-the-scenes details of the language.
