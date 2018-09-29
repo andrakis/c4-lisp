@@ -1,3 +1,7 @@
 *.o
 /build/
 /dist/
+/platform/scheme/build/
+/platform/scheme/dist/
+*.swp
+*~

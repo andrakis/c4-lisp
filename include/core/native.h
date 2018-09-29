@@ -101,4 +101,30 @@
 #error "Unable to detect compiler (valid: windows, gcc)"
 #endif
 
+#ifndef CND_PLATFORM
+	#if TARGET_LINUX
+		#define CND_PLATFORM "GNU-Linux"
+	#else
+		#error "Unable to determine CND_PLATFORM"
+	#endif
+#endif // CND_PLATFORM
+
+#ifndef CND_CONF
+	#if DEBUG && !NDEBUG
+		#define CND_CONF "Debug"
+	#else
+		#define CND_CONF "Release"
+	#endif
+#endif
+
+#if TARGET_GCC
+#define RTL_SO "so"
+#else
+#error "Unable to determine shared object extension for this platform"
+#endif
+
+#define RTL "rtl"
+
+#define runtime_path() RTL "/" CND_PLATFORM "/libscheme." CND_CONF "." RTL_SO
+
 #endif

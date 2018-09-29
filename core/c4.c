@@ -53,7 +53,7 @@ enum {
 	LEA ,IMM ,JMP ,JSR ,BZ  ,BNZ ,ENT ,ADJ ,LEV ,LI  ,LC  ,SI  ,SC  ,PSH ,
 	OR  ,XOR ,AND ,EQ  ,NE  ,LT  ,GT  ,LE  ,GE  ,SHL ,SHR ,ADD ,SUB ,MUL ,DIV ,MOD ,
 	// C functions
-	OPEN,READ,CLOS,PRTF,DPRT,MALC,FREE,MSET,MCMP,EXIT,FDSZ,
+	OPEN,READ,CLOS,PRTF,DPRT,MALC,FREE,MSET,MCMP,EXIT,FDSZ,PINI,RPTH,
 	// Extended system calls (handled externally)
 	SYS1,SYS2,SYS3,SYS4,SYSI,
 	// Pointer to last element
@@ -68,6 +68,7 @@ void setup_opcodes() {
 		"SC  ,PSH ,OR  ,XOR ,AND ,EQ  ,NE  ,LT  ,GT  ,LE  ,GE  ,SHL ,"
 		"SHR ,ADD ,SUB ,MUL ,DIV ,MOD ,"
 		"OPEN,READ,CLOS,PRTF,DPRT,MALC,FREE,MSET,MCMP,EXIT,FDSZ,"
+		"PINI,RPTH,"
 		"SYS1,SYS2,SYS3,SYS4,SYSI";
 }
 
@@ -79,6 +80,8 @@ void setup_symbols() {
 		"char else enum if int return sizeof while "
 		// C functions
 		"open read close printf dprintf malloc free memset memcmp exit fdsize "
+		// Dynamci runtime platform functions
+		"platform_init runtime_path "
 		// Syscalls
 		"syscall1 syscall2 syscall3 syscall4 syscall_init "
 		// void data type
@@ -94,7 +97,7 @@ enum { CHAR, INT, PTR };
 enum { STDIN, STDOUT, STDERR };
 
 // identifier offsets (since we can't create an ident struct)
-enum { Tk, Hash, Name, Class, Type, Val, HClass, HType, HVal, Idsz };
+enum { Tk, Hash, Name, NameLen, Class, Type, Val, HClass, HType, HVal, Idsz };
 
 int B_MAGIC;
 
@@ -105,10 +108,32 @@ enum {
 	B_p_sym, B_p_e, B_p_data, B_p_sp,   // process initial values
 	B_pc, B_bp, B_sp, B_a, B_cycle,
 	B_i,  B_t, B_halted,
+	B_sym_iop_handler, // invalid operation handler
 	__B
 };
 
+// Lookup an item by name in the symbol table
+int *lookup_symbol(char *name, int *symbols) {
+	int name_len;
+	int *symbol;
+	char *tmp;
 
+	// inline strlen
+	name_len = 0;
+	tmp = name;
+	while(*tmp) { ++name_len; ++tmp; }
+
+	symbol = symbols;
+	while(symbol[Tk]) {
+		if(symbol[NameLen] == name_len && !memcmp((char *)symbol[Name], name, name_len))
+			return symbol;
+		symbol = symbol + Idsz;
+	}
+
+	return 0;
+}
+
+// Compiler: read next symbol and assemble
 void next()
 {
 	char *pp;
@@ -141,6 +166,7 @@ void next()
 				id = id + Idsz;
 			}
 			id[Name] = (int)pp;
+			id[NameLen] = p - pp;
 			id[Hash] = tk;
 			tk = id[Tk] = Id;
 			return;
@@ -192,7 +218,17 @@ void next()
 		}
 		else if (tk == '=') { if (*p == '=') { ++p; tk = Eq; } else tk = Assign; return; }
 		else if (tk == '+') { if (*p == '+') { ++p; tk = Inc; } else tk = Add; return; }
-		else if (tk == '-') { if (*p == '-') { ++p; tk = Dec; } else tk = Sub; return; }
+		else if (tk == '-') {
+			if (*p == '-') {
+				// Decrement
+				++p; tk = Dec;
+			} else if(*p >= '0' && *p <= '9') {
+				// Handle number and make it negative
+				next(); ival = ival * -1;
+			} else
+				tk = Sub;
+			return; 
+		}
 		else if (tk == '!') { if (*p == '=') { ++p; tk = Ne; } return; }
 		else if (tk == '<') { if (*p == '=') { ++p; tk = Le; } else if (*p == '<') { ++p; tk = Shl; } else tk = Lt; return; }
 		else if (tk == '>') { if (*p == '=') { ++p; tk = Ge; } else if (*p == '>') { ++p; tk = Shr; } else tk = Gt; return; }
@@ -235,7 +271,7 @@ void expr(int lev)
 			next();
 			if (d[Class] == Sys) *++e = d[Val];
 			else if (d[Class] == Fun) { *++e = JSR; *++e = d[Val]; }
-			else { dprintf(STDERR, "%d: bad function call\n", line); exit(-1); }
+			else { dprintf(STDERR, "%d: bad function call, class=%d\n", line, d[Class]); exit(-1); }
 			if (t) { *++e = ADJ; *++e = t; }
 			ty = d[Type];
 		}
@@ -406,10 +442,18 @@ void stmt()
 	}
 }
 
+enum { IOP_MISSING = -2, IOP_HANDLED = -1 };
+
+int invalid_opcode_handler(int op, int *process) {
+	if(process[B_sym_iop_handler])
+		return process[B_sym_iop_handler];
+	return IOP_MISSING;
+}
+
 int run_cycle(int *process, int cycles) {
 	int *pc, *sp, *bp, a; // vm registers
 	int cycle, rem_cycle; // cycle counts
-	int i, *t; // temps
+	int i, *t, b; // temps
 
 	if(process[B_magic] != B_MAGIC) {
 		dprintf(STDERR, "Invalid process magic: %d\n", process[B_magic]);
@@ -434,13 +478,23 @@ int run_cycle(int *process, int cycles) {
 		  if (i <= ADJ) dprintf(STDERR, " %d\n", *pc); else dprintf(STDERR, "\n");
 		}
 		// Basic VM operations
+		// LEA: move A, BP + [ptr PC]; inc PC
 		if      (i == LEA) a = (int)(bp + *pc++);                             // load local address
+		// IMM: move A, [ptr PC]; inc PC
 		else if (i == IMM) a = *pc++;                                         // load global address or immediate
+		// JMP: move PC, [ptr PC]
 		else if (i == JMP) pc = (int *)*pc;                                   // jump
+		// JSR: Save next instruction address to stack and set PC to given value
+		//      push PC+1; move PC, [ptr PC]
 		else if (i == JSR) { *--sp = (int)(pc + 1); pc = (int *)*pc; }        // jump to subroutine
+		// BZ : move PC, [A != 0 then PC + 1 else [ptr PC]]
 		else if (i == BZ)  pc = a ? pc + 1 : (int *)*pc;                      // branch if zero
+		// BNZ: move PC, [A != 0 then [ptr PC] else PC + 1]
 		else if (i == BNZ) pc = a ? (int *)*pc : pc + 1;                      // branch if not zero
+		// ENT:
+		//      push BP; move BP, SP; sub SP, [ptr PC]; inc PC
 		else if (i == ENT) { *--sp = (int)bp; bp = sp; sp = sp - *pc++; }     // enter subroutine
+		// ADJ: add SP, [ptr PC]; inc PC
 		else if (i == ADJ) sp = sp + *pc++;                                   // stack adjust
 		else if (i == LEV) { sp = bp; bp = (int *)*sp++; pc = (int *)*sp++; } // leave subroutine
 		else if (i == LI)  a = *(int *)a;                                     // load int
@@ -479,7 +533,7 @@ int run_cycle(int *process, int cycles) {
 			if(verbose) dprintf(STDERR, "exit(%d) cycle = %d\n", *sp, cycle);
 			process[B_halted] = 1;
 			process[B_exitcode] = *sp;
-			rem_cycle = 0; 
+			rem_cycle = 0;
 		}
 		else if (i == SYS1) { a = (int)syscall1(*sp); }
 		else if (i == SYS2) { a = (int)syscall2(sp[1], *sp); }
@@ -487,11 +541,20 @@ int run_cycle(int *process, int cycles) {
 		else if (i == SYS4) { a = (int)syscall4(sp[3], sp[2], sp[1], *sp); }
 		else if (i == SYSI) { a = (int)syscall_init(sp[1], *sp); }
 		else if (i == FDSZ) { a = fdsize(*sp); }
+		else if (i == PINI) { a = platform_init((char*)*sp); }
+		else if (i == RPTH) { a = (int)runtime_path(); }
 		else {
-			dprintf(STDERR, "unknown instruction = %d! cycle = %d\n", i, cycle);
-			process[B_halted] = 1;
-			process[B_exitcode] = -1;
-			rem_cycle = 0; 
+			b = invalid_opcode_handler(i, process);
+			if(b >= 0) {
+				// TODO: setup call to handler
+			} else if(b == IOP_HANDLED) {
+				// Do nothing
+			} else if(b == IOP_MISSING) {
+				dprintf(STDERR, "unknown instruction = %d! cycle = %d\n", i, cycle);
+				process[B_halted] = 1;
+				process[B_exitcode] = -1;
+				rem_cycle = 0;
+			}
 		}
 	}
 
@@ -533,7 +596,7 @@ int *create_process(char *source, int argc, char **argv) {
 	i = Char; while (i <= While) { next(); id[Tk] = i++; } // add keywords to symbol table
 	i = OPEN; while (i < _SYMS) { next(); id[Class] = Sys; id[Type] = INT; id[Val] = i++; } // add library to symbol table
 	next(); id[Tk] = Char; // handle void type
-	next(); idmain = id; // keep track of main
+	next();
 
 	// update global used in parsing process
 	p = source;
@@ -633,13 +696,18 @@ int *create_process(char *source, int argc, char **argv) {
 		next();
 	}
 
-	if (!(pc = (int *)idmain[Val])) { dprintf(STDERR, "main() not defined\n"); return 0; }
+	idmain = lookup_symbol("main", sym);
+	if (!idmain) { dprintf(STDERR, "main() not defined\n"); return 0; }
+	pc = (int *)idmain[Val];
 
-	// setup stack
+	// Setup stack to point to top of allocated memory.
+	// As in many CPU architectures, the stack grows downwards from the top.
+	// If a stack overflow occurs, data may get overwritten.
 	bp = sp = (int *)((int)sp + poolsz);
     // write stack values and small function to exit if main returns
     //
     //  [BOTTOM OF STACK]
+	//  [AVAILABLE STACK SPACE] // 0 to poolsz-5
     //  $label0           // addr of return location, left on the
     //                       stack so that the LEV instruction sets
     //                       pc to the location of the PSH instruction.
@@ -656,13 +724,11 @@ int *create_process(char *source, int argc, char **argv) {
 	*--sp = (int)argv;
 	*--sp = (int)t;
 
-	free((void*)process[B_p_sym]);
-
 	if(verbose) {
 		dprintf(STDERR, "Process image information:\n");
-		dprintf(STDERR, "  Emitted code size: %d\n", (int)(e - process[B_p_e]));
-		dprintf(STDERR, "  Emitted data size: %d\n", (int)(data - process[B_p_data]));
-		dprintf(STDERR, "  main() entry point: %d\n", (int)pc);
+		dprintf(STDERR, "  Emitted code size: %ld\n", (int)(e - (int*)process[B_p_e]));
+		dprintf(STDERR, "  Emitted data size: %ld\n", (int)(data - (char*)process[B_p_data]));
+		dprintf(STDERR, "  main() entry point: %x\n", pc);
 	}
 
 	process[B_magic] = B_MAGIC;
@@ -690,7 +756,13 @@ void free_process(int *process) {
 	free((void*)process[B_p_e]);
 	free((void*)process[B_p_sp]);
 	free((void*)process[B_p_data]);
+	free((void*)process[B_p_sym]);
 	free((void*)process);
+}
+
+// Extra library stuff
+char *get_runtime() {
+	return runtime_path();
 }
 
 #if 0
@@ -703,6 +775,10 @@ int c5_lispmain(int argc, char **argv) {
 	dprintf(STDERR, "Indirect call to c5_lispmain not supported\n");
 	return 1;
 #endif
+	// Runtime not loaded, load it
+	if(platform_init(get_runtime())) {
+		return 1;
+	}
 	return syscall3(SYS3_LISP_MAIN, argc, (int)argv);
 }
 
@@ -711,9 +787,9 @@ int c5_lispmain(int argc, char **argv) {
 int main(int argc, char **argv)
 {
 	int fd;
-	char *pp, *tmp;
+	char *pp, *tmp, **tmp2;
 	int *process;
-	int i, ii, srcsize, exitcode;
+	int early_param_exit, i, ii, srcsize, exitcode;
 
 	vm_cycle_count = 1000;
 
@@ -731,8 +807,8 @@ int main(int argc, char **argv)
 	memset(vm_processes, 0, vm_proc_max * sizeof(int*));
 
 	--argc; ++argv;
-	i = 0; // when to exit parameter parsing
-	while(argc > 0 && **argv == '-' && i == 0) {
+	early_param_exit = 0; // when to exit parameter parsing
+	while(argc > 0 && **argv == '-' && early_param_exit == 0) {
 		// -s      show source and exit
 		if ((*argv)[1] == 's') { src = 1; }
 		// -d      show source during execution
@@ -746,7 +822,7 @@ int main(int argc, char **argv)
 			while(*pp != 0) {
 				vm_cycle_count = vm_cycle_count * 10 + (*pp++ - '0');
 			}
-			dprintf(STDERR, "Cycle count set to %i\n", vm_cycle_count);
+			dprintf(STDERR, "Cycle count set to %early_param_exit\n", vm_cycle_count);
 		}
 		// -r xyz  start additional process
 		else if((*argv)[1] == 'r') {
@@ -756,9 +832,11 @@ int main(int argc, char **argv)
 		}
 		// -L      enter lispmain
 		else if((*argv)[1] == 'L') {
-#if 0
-			// start lisp4.c instead
+#if 0  // Run under c4 only
+			// start lisp4.c instead, and end parameter passing
 			vm_processes[vm_proc_count++] = (int)"lisp4.c";
+			early_param_exit = 1;
+			++argc; --argv; // set arguments correctly
 			if(0) // Dummy out the next call
 #else
 				free(vm_processes);
@@ -771,7 +849,7 @@ int main(int argc, char **argv)
 		// -v      enable verbose mode
 		else if((*argv)[1] == 'v') { verbose = 1; }
 		// --      end parameter passing
-		else if((*argv)[1] == '-') { i = 1; }
+		else if((*argv)[1] == '-') { early_param_exit = 1; }
 		else {
 			dprintf(STDERR, "Invalid argument: %s\n", *argv);
 			free(vm_processes);
@@ -780,13 +858,28 @@ int main(int argc, char **argv)
 		--argc; ++argv;
 	}
 	if (vm_proc_count < 1 && argc < 1) { free(vm_processes); dprintf(STDERR, "usage: c5 [-L] [-s] [-d] [-v] [-c nnn] [-r file] file args...\n"); return -1; }
-	if (argc > 0) vm_processes[vm_proc_count++] = (int)*argv;
+	// Only add next arg as process if early parameter parsing was not invoked
+	if (early_param_exit == 0 && argc > 0) vm_processes[vm_proc_count++] = (int)*argv;
+
+	// Start runtime
+	if(verbose) dprintf(STDERR, "Load runtime: %s\n", get_runtime());
+	if(platform_init(get_runtime())) {
+		free(vm_processes);
+		return 1;
+	}
+
 
 	// Start all vm_processes
 	i = 0;
 	while(i < vm_proc_count) {
 		tmp = (char*)vm_processes[i];
-		if (verbose) dprintf(STDERR, "->Start process: %s\n", tmp);
+		if (verbose) {
+			dprintf(STDERR, "->Start process: %s (%d, ", tmp, argc);
+			ii = argc; tmp2 = argv;
+			while(ii--)
+				dprintf(STDERR, "%s ", *tmp2++);
+			dprintf(STDERR, ")\n");
+		}
 		if ((fd = open(tmp, 0)) < 0) {
 			dprintf(STDERR, "could not open(%s), ensure options are before filename\n", tmp); return -1;
 		}
@@ -798,8 +891,8 @@ int main(int argc, char **argv)
 		close(fd);
 		process = create_process(p, argc, argv);
 		free((void*)pp);
-		if(process == 0) { dprintf(STDERR, "Invalid process\n"); return -1; }
-		vm_processes[i++] = (int)process;
+		if(process != 0) vm_processes[i] = (int)process;
+		++i;
 	}
 
 	// run...

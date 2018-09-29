@@ -1,0 +1,158 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configurationDescriptor version="97">
+  <logicalFolder name="root" displayName="root" projectFiles="true" kind="ROOT">
+    <logicalFolder name="HeaderFiles"
+                   displayName="Header Files"
+                   projectFiles="true">
+      <logicalFolder name="scheme" displayName="scheme" projectFiles="true">
+        <itemPath>../../include/platform/scheme/cell.h</itemPath>
+        <itemPath>../../include/platform/scheme/scheme.h</itemPath>
+      </logicalFolder>
+    </logicalFolder>
+    <logicalFolder name="ResourceFiles"
+                   displayName="Resource Files"
+                   projectFiles="true">
+    </logicalFolder>
+    <logicalFolder name="SourceFiles"
+                   displayName="Source Files"
+                   projectFiles="true">
+      <logicalFolder name="scheme" displayName="scheme" projectFiles="true">
+        <itemPath>Makefile</itemPath>
+        <itemPath>scheme.c</itemPath>
+        <itemPath>scheme_internal.cpp</itemPath>
+        <itemPath>syscalls.c</itemPath>
+      </logicalFolder>
+    </logicalFolder>
+    <logicalFolder name="TestFiles"
+                   displayName="Test Files"
+                   projectFiles="false"
+                   kind="TEST_LOGICAL_FOLDER">
+    </logicalFolder>
+    <logicalFolder name="ExternalFiles"
+                   displayName="Important Files"
+                   projectFiles="false"
+                   kind="IMPORTANT_FILES_FOLDER">
+      <itemPath>Makefile</itemPath>
+    </logicalFolder>
+  </logicalFolder>
+  <sourceRootList>
+    <Elem>.</Elem>
+    <Elem>../../include/platform/scheme</Elem>
+  </sourceRootList>
+  <projectmakefile>Makefile</projectmakefile>
+  <confs>
+    <conf name="Debug" type="2">
+      <toolsSet>
+        <compilerSet>default</compilerSet>
+        <dependencyChecking>true</dependencyChecking>
+        <rebuildPropChanged>false</rebuildPropChanged>
+      </toolsSet>
+      <compileType>
+        <cTool>
+          <incDir>
+            <pElem>../../include</pElem>
+          </incDir>
+          <commandLine>-Wno-format -rdynamic -Wall -Werror</commandLine>
+          <preprocessorList>
+            <Elem>DEBUG</Elem>
+            <Elem>GCC_RDYNAMIC</Elem>
+          </preprocessorList>
+        </cTool>
+        <ccTool>
+          <stripSymbols>true</stripSymbols>
+          <standard>11</standard>
+          <incDir>
+            <pElem>../../include</pElem>
+          </incDir>
+          <commandLine>-Wno-format -rdynamic -Wall -Werror</commandLine>
+          <preprocessorList>
+            <Elem>CPP14</Elem>
+            <Elem>DEBUG</Elem>
+            <Elem>RDYNAMIC</Elem>
+          </preprocessorList>
+        </ccTool>
+        <linkerTool>
+          <output>../../rtl/${CND_PLATFORM}/libscheme.${CND_CONF}.${CND_DLIB_EXT}</output>
+        </linkerTool>
+      </compileType>
+      <item path="../../include/platform/scheme/cell.h"
+            ex="false"
+            tool="3"
+            flavor2="0">
+      </item>
+      <item path="../../include/platform/scheme/scheme.h"
+            ex="false"
+            tool="3"
+            flavor2="0">
+      </item>
+      <item path="Makefile" ex="false" tool="3" flavor2="0">
+      </item>
+      <item path="scheme.c" ex="false" tool="0" flavor2="0">
+      </item>
+      <item path="scheme_internal.cpp" ex="false" tool="1" flavor2="0">
+      </item>
+      <item path="syscalls.c" ex="false" tool="0" flavor2="0">
+      </item>
+    </conf>
+    <conf name="Release" type="2">
+      <toolsSet>
+        <compilerSet>default</compilerSet>
+        <dependencyChecking>true</dependencyChecking>
+        <rebuildPropChanged>false</rebuildPropChanged>
+      </toolsSet>
+      <compileType>
+        <cTool>
+          <developmentMode>5</developmentMode>
+          <incDir>
+            <pElem>../../include</pElem>
+          </incDir>
+          <commandLine>-Wno-format</commandLine>
+          <preprocessorList>
+            <Elem>NDEBUG</Elem>
+            <Elem>RELEASE</Elem>
+          </preprocessorList>
+        </cTool>
+        <ccTool>
+          <developmentMode>5</developmentMode>
+          <standard>11</standard>
+          <incDir>
+            <pElem>../../include</pElem>
+          </incDir>
+          <commandLine>-Wno-format</commandLine>
+          <preprocessorList>
+            <Elem>CPP14</Elem>
+            <Elem>NDEBUG</Elem>
+            <Elem>RELEASE</Elem>
+          </preprocessorList>
+        </ccTool>
+        <fortranCompilerTool>
+          <developmentMode>5</developmentMode>
+        </fortranCompilerTool>
+        <asmTool>
+          <developmentMode>5</developmentMode>
+        </asmTool>
+        <linkerTool>
+          <output>../../rtl/${CND_PLATFORM}/libscheme.${CND_CONF}.${CND_DLIB_EXT}</output>
+        </linkerTool>
+      </compileType>
+      <item path="../../include/platform/scheme/cell.h"
+            ex="false"
+            tool="3"
+            flavor2="0">
+      </item>
+      <item path="../../include/platform/scheme/scheme.h"
+            ex="false"
+            tool="3"
+            flavor2="0">
+      </item>
+      <item path="Makefile" ex="false" tool="3" flavor2="0">
+      </item>
+      <item path="scheme.c" ex="false" tool="0" flavor2="0">
+      </item>
+      <item path="scheme_internal.cpp" ex="false" tool="1" flavor2="0">
+      </item>
+      <item path="syscalls.c" ex="false" tool="0" flavor2="0">
+      </item>
+    </conf>
+  </confs>
+</configurationDescriptor>

@@ -38,9 +38,7 @@ OBJECTFILES= \
 	${OBJECTDIR}/core/c4.o \
 	${OBJECTDIR}/core/extras.o \
 	${OBJECTDIR}/core/main.o \
-	${OBJECTDIR}/core/syscalls.o \
-	${OBJECTDIR}/platform/scheme/scheme.o \
-	${OBJECTDIR}/platform/scheme/scheme_internal.o
+	${OBJECTDIR}/core/syscalls.o
 
 
 # C Compiler Flags
@@ -57,7 +55,7 @@ FFLAGS=
 ASFLAGS=
 
 # Link Libraries and Options
-LDLIBSOPTIONS=
+LDLIBSOPTIONS=-ldl
 
 # Build Targets
 .build-conf: ${BUILD_SUBPROJECTS}
@@ -70,35 +68,26 @@ ${CND_DISTDIR}/${CND_CONF}/${CND_PLATFORM}/lisp4: ${OBJECTFILES}
 ${OBJECTDIR}/core/c4.o: core/c4.c 
 	${MKDIR} -p ${OBJECTDIR}/core
 	${RM} "$@.d"
-	$(COMPILE.c) -g -DDEBUG -DGCC_RDYNAMIC -Iinclude -Inon-contrib/string_view-standalone/include -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/core/c4.o core/c4.c
+	$(COMPILE.c) -g -DDEBUG -DGCC_RDYNAMIC -Iinclude -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/core/c4.o core/c4.c
 
 ${OBJECTDIR}/core/extras.o: core/extras.c 
 	${MKDIR} -p ${OBJECTDIR}/core
 	${RM} "$@.d"
-	$(COMPILE.c) -g -DDEBUG -DGCC_RDYNAMIC -Iinclude -Inon-contrib/string_view-standalone/include -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/core/extras.o core/extras.c
+	$(COMPILE.c) -g -DDEBUG -DGCC_RDYNAMIC -Iinclude -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/core/extras.o core/extras.c
 
 ${OBJECTDIR}/core/main.o: core/main.cpp 
 	${MKDIR} -p ${OBJECTDIR}/core
 	${RM} "$@.d"
-	$(COMPILE.cc) -g -DCPP14 -DDEBUG -DGCC_RDYNAMIC -Iinclude -Inon-contrib/string_view-standalone/include -std=c++14 -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/core/main.o core/main.cpp
+	$(COMPILE.cc) -g -DCPP14 -DDEBUG -DGCC_RDYNAMIC -Iinclude -std=c++14 -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/core/main.o core/main.cpp
 
-${OBJECTDIR}/core/syscalls.o: core/syscalls.c 
+${OBJECTDIR}/core/syscalls.o: core/syscalls.cpp 
 	${MKDIR} -p ${OBJECTDIR}/core
 	${RM} "$@.d"
-	$(COMPILE.c) -g -DDEBUG -DGCC_RDYNAMIC -Iinclude -Inon-contrib/string_view-standalone/include -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/core/syscalls.o core/syscalls.c
-
-${OBJECTDIR}/platform/scheme/scheme.o: platform/scheme/scheme.c 
-	${MKDIR} -p ${OBJECTDIR}/platform/scheme
-	${RM} "$@.d"
-	$(COMPILE.c) -g -DDEBUG -DGCC_RDYNAMIC -Iinclude -Inon-contrib/string_view-standalone/include -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/platform/scheme/scheme.o platform/scheme/scheme.c
-
-${OBJECTDIR}/platform/scheme/scheme_internal.o: platform/scheme/scheme_internal.cpp 
-	${MKDIR} -p ${OBJECTDIR}/platform/scheme
-	${RM} "$@.d"
-	$(COMPILE.cc) -g -DCPP14 -DDEBUG -DGCC_RDYNAMIC -Iinclude -Inon-contrib/string_view-standalone/include -std=c++14 -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/platform/scheme/scheme_internal.o platform/scheme/scheme_internal.cpp
+	$(COMPILE.cc) -g -DCPP14 -DDEBUG -DGCC_RDYNAMIC -Iinclude -std=c++14 -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/core/syscalls.o core/syscalls.cpp
 
 # Subprojects
 .build-subprojects:
+	cd platform/scheme && ${MAKE}  -f Makefile CONF=Debug
 
 # Clean Targets
 .clean-conf: ${CLEAN_SUBPROJECTS}
@@ -107,6 +96,7 @@ ${OBJECTDIR}/platform/scheme/scheme_internal.o: platform/scheme/scheme_internal.
 
 # Subprojects
 .clean-subprojects:
+	cd platform/scheme && ${MAKE}  -f Makefile CONF=Debug clean
 
 # Enable dependency checking
 .dep.inc: .depcheck-impl

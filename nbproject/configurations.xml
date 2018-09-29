@@ -6,8 +6,10 @@
                    projectFiles="true">
       <logicalFolder name="core" displayName="core" projectFiles="true">
         <itemPath>include/core/c5_native.h</itemPath>
+        <itemPath>include/core/except.h</itemPath>
         <itemPath>include/core/extras.h</itemPath>
         <itemPath>include/core/native.h</itemPath>
+        <itemPath>include/core/solar.hpp</itemPath>
         <itemPath>include/core/stacktrace.h</itemPath>
         <itemPath>include/core/syscalls.h</itemPath>
       </logicalFolder>
@@ -29,11 +31,7 @@
         <itemPath>core/c4.c</itemPath>
         <itemPath>core/extras.c</itemPath>
         <itemPath>core/main.cpp</itemPath>
-        <itemPath>core/syscalls.c</itemPath>
-      </logicalFolder>
-      <logicalFolder name="scheme" displayName="scheme" projectFiles="true">
-        <itemPath>platform/scheme/scheme.c</itemPath>
-        <itemPath>platform/scheme/scheme_internal.cpp</itemPath>
+        <itemPath>core/syscalls.cpp</itemPath>
       </logicalFolder>
       <itemPath>LICENSE</itemPath>
       <itemPath>Makefile</itemPath>
@@ -65,7 +63,6 @@
         <cTool>
           <incDir>
             <pElem>include</pElem>
-            <pElem>non-contrib/string_view-standalone/include</pElem>
           </incDir>
           <commandLine>-Wno-format -rdynamic</commandLine>
           <preprocessorList>
@@ -77,7 +74,6 @@
           <standard>11</standard>
           <incDir>
             <pElem>include</pElem>
-            <pElem>non-contrib/string_view-standalone/include</pElem>
           </incDir>
           <commandLine>-Wno-format -rdynamic -Wall -Werror</commandLine>
           <preprocessorList>
@@ -85,7 +81,25 @@
             <Elem>DEBUG</Elem>
             <Elem>GCC_RDYNAMIC</Elem>
           </preprocessorList>
+          <useLinkerLibraries>false</useLinkerLibraries>
         </ccTool>
+        <linkerTool>
+          <linkerLibItems>
+            <linkerLibStdlibItem>DynamicLinking</linkerLibStdlibItem>
+          </linkerLibItems>
+        </linkerTool>
+        <requiredProjects>
+          <makeArtifact PL="platform/scheme"
+                        CT="2"
+                        CN="Debug"
+                        AC="false"
+                        BL="true"
+                        WD="platform/scheme"
+                        BC="${MAKE}  -f Makefile CONF=Debug"
+                        CC="${MAKE}  -f Makefile CONF=Debug clean"
+                        OP="${CND_DISTDIR}/${CND_CONF}/${CND_PLATFORM}/libscheme.${CND_DLIB_EXT}">
+          </makeArtifact>
+        </requiredProjects>
       </compileType>
       <item path="LICENSE" ex="false" tool="3" flavor2="0">
       </item>
@@ -97,13 +111,17 @@
       </item>
       <item path="core/main.cpp" ex="false" tool="1" flavor2="0">
       </item>
-      <item path="core/syscalls.c" ex="false" tool="0" flavor2="0">
+      <item path="core/syscalls.cpp" ex="false" tool="1" flavor2="0">
       </item>
       <item path="include/core/c5_native.h" ex="false" tool="3" flavor2="0">
+      </item>
+      <item path="include/core/except.h" ex="false" tool="3" flavor2="0">
       </item>
       <item path="include/core/extras.h" ex="false" tool="3" flavor2="0">
       </item>
       <item path="include/core/native.h" ex="false" tool="3" flavor2="0">
+      </item>
+      <item path="include/core/solar.hpp" ex="false" tool="3" flavor2="0">
       </item>
       <item path="include/core/stacktrace.h" ex="false" tool="3" flavor2="0">
       </item>
@@ -112,13 +130,6 @@
       <item path="include/platform/scheme/cell.h" ex="false" tool="3" flavor2="0">
       </item>
       <item path="include/platform/scheme/scheme.h" ex="false" tool="3" flavor2="0">
-      </item>
-      <item path="platform/scheme/scheme.c" ex="false" tool="0" flavor2="0">
-      </item>
-      <item path="platform/scheme/scheme_internal.cpp"
-            ex="false"
-            tool="1"
-            flavor2="0">
       </item>
     </conf>
     <conf name="Release" type="1">
@@ -132,7 +143,6 @@
           <developmentMode>5</developmentMode>
           <incDir>
             <pElem>include</pElem>
-            <pElem>non-contrib/string_view-standalone/include</pElem>
           </incDir>
           <commandLine>-Wno-format</commandLine>
           <preprocessorList>
@@ -145,7 +155,6 @@
           <standard>11</standard>
           <incDir>
             <pElem>include</pElem>
-            <pElem>non-contrib/string_view-standalone/include</pElem>
           </incDir>
           <commandLine>-Wno-format</commandLine>
           <preprocessorList>
@@ -160,6 +169,23 @@
         <asmTool>
           <developmentMode>5</developmentMode>
         </asmTool>
+        <linkerTool>
+          <linkerLibItems>
+            <linkerLibStdlibItem>DynamicLinking</linkerLibStdlibItem>
+          </linkerLibItems>
+        </linkerTool>
+        <requiredProjects>
+          <makeArtifact PL="platform/scheme"
+                        CT="2"
+                        CN="Release"
+                        AC="true"
+                        BL="true"
+                        WD="platform/scheme"
+                        BC="${MAKE}  -f Makefile CONF=Release"
+                        CC="${MAKE}  -f Makefile CONF=Release clean"
+                        OP="${CND_DISTDIR}/${CND_CONF}/${CND_PLATFORM}/libscheme.${CND_DLIB_EXT}">
+          </makeArtifact>
+        </requiredProjects>
       </compileType>
       <item path="LICENSE" ex="false" tool="3" flavor2="0">
       </item>
@@ -171,13 +197,17 @@
       </item>
       <item path="core/main.cpp" ex="false" tool="1" flavor2="0">
       </item>
-      <item path="core/syscalls.c" ex="false" tool="0" flavor2="0">
+      <item path="core/syscalls.cpp" ex="false" tool="1" flavor2="0">
       </item>
       <item path="include/core/c5_native.h" ex="false" tool="3" flavor2="0">
+      </item>
+      <item path="include/core/except.h" ex="false" tool="3" flavor2="0">
       </item>
       <item path="include/core/extras.h" ex="false" tool="3" flavor2="0">
       </item>
       <item path="include/core/native.h" ex="false" tool="3" flavor2="0">
+      </item>
+      <item path="include/core/solar.hpp" ex="false" tool="3" flavor2="0">
       </item>
       <item path="include/core/stacktrace.h" ex="false" tool="3" flavor2="0">
       </item>
@@ -186,13 +216,6 @@
       <item path="include/platform/scheme/cell.h" ex="false" tool="3" flavor2="0">
       </item>
       <item path="include/platform/scheme/scheme.h" ex="false" tool="3" flavor2="0">
-      </item>
-      <item path="platform/scheme/scheme.c" ex="false" tool="0" flavor2="0">
-      </item>
-      <item path="platform/scheme/scheme_internal.cpp"
-            ex="false"
-            tool="1"
-            flavor2="0">
       </item>
     </conf>
   </confs>

@@ -4,7 +4,7 @@
 #include <string.h>
 
 #include <stdexcept> // for string_view on GCC < 5
-#include <bpstd/string_view.hpp>
+#include "non-contrib/bpstd/string_view.hpp"
 
 #include "core/native.h"
 #include "core/stacktrace.h"

@@ -25,7 +25,7 @@
 #include <memory>
 #include <sstream>
 #include <stdexcept> // For string_view
-#include <bpstd/string_view.hpp>
+#include "non-contrib/bpstd/string_view.hpp"
 
 using namespace bpstd;
 

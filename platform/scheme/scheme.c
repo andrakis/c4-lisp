@@ -245,7 +245,7 @@ void *eval(void *x, void *env) {
 	int type, size, i;
 	void *result, *first, *test, *conseq, *alt;
 	void *proc, *exps;
-	void *t1, *t2, *t3;
+	void *t1, *t2;
 	
 	if(debug) printf("eval(%x, %x)\n", x, env);
 
