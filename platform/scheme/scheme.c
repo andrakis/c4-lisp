@@ -9,6 +9,8 @@
 #define SYSCALLS
 #include "core/syscalls.h"
 
+#include "core/extras.h"
+
 int debug;
 
 // enum cell_type {
@@ -419,6 +421,21 @@ int main(int argc, char **argv)
 	void *global, *tokens, *result;
 	char *tmp;
 
+	// setup globals
+	debug = 0;
+	//code = "(print (quote Hello))";
+	code = "(print (quote Two plus 2 is) (+ 1 1))";
+	--argc; ++argv;
+	parse_args(argc, argv);
+
+#if 0
+	// Requires the scheme library
+	tmp = "scheme";
+	if(debug)
+		dprintf(2, "Load runtime library %s: %s\n", "scheme", runtime_path(tmp));
+	platform_init(runtime_path(tmp));
+#endif
+
 	// Ensure syscalls are up to date
 	if(!syscall_init(1, _SYS1_END) ||
 	   !syscall_init(2, _SYS2_END) ||
@@ -427,13 +444,6 @@ int main(int argc, char **argv)
 		printf("Syscall init failed, recompile / check headers\n");
 		return -1;
 	}
-
-	// setup globals
-	debug = 0;
-	//code = "(print (quote Hello))";
-	code = "(print (quote Two plus 2 is) (+ 1 1))";
-	--argc; ++argv;
-	parse_args(argc, argv);
 
 	// Setup predefined symbols used in eval
 	s_quote = "quote";

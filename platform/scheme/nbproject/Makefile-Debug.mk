@@ -41,11 +41,11 @@ OBJECTFILES= \
 
 
 # C Compiler Flags
-CFLAGS=-Wno-format -rdynamic -Wall -Werror
+CFLAGS=-Wno-format -rdynamic -Wall -Werror -Wno-error=unused-function
 
 # CC Compiler Flags
-CCFLAGS=-Wno-format -rdynamic -Wall -Werror
-CXXFLAGS=-Wno-format -rdynamic -Wall -Werror
+CCFLAGS=-Wno-format -rdynamic -Wall -Werror -Wno-error=unused-function
+CXXFLAGS=-Wno-format -rdynamic -Wall -Werror -Wno-error=unused-function
 
 # Fortran Compiler Flags
 FFLAGS=

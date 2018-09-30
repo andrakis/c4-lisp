@@ -123,8 +123,4 @@
 #error "Unable to determine shared object extension for this platform"
 #endif
 
-#define RTL "rtl"
-
-#define runtime_path() RTL "/" CND_PLATFORM "/libscheme." CND_CONF "." RTL_SO
-
 #endif

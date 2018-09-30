@@ -26,9 +26,12 @@ namespace C4 {
 		const char *what() const noexcept { return message.c_str(); }
 	};
 
+#define QUOTE(Val) #Val
+
 #define GENERIC_EXCEPTION(Name) \
 	class Name : public generic_exception { \
 	public: \
+	Name() : generic_exception(QUOTE(Name)) { } \
 	Name(const char *msg) : generic_exception(msg) { } \
 	Name(std::string msg) : generic_exception(msg) { } \
 	};

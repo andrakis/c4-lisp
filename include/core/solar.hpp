@@ -27,6 +27,8 @@ namespace C4 {
 	namespace Solar {
 		GENERIC_EXCEPTION(library_notfound)
 		GENERIC_EXCEPTION(symbol_notfound)
+		GENERIC_EXCEPTION(null_library)
+		GENERIC_EXCEPTION(null_function)
 	
 		class Library;
 		typedef void *LibraryHandle;
@@ -34,19 +36,24 @@ namespace C4 {
 
 		template<typename FuncType>
 		class Func {
+		protected:
 			typedef FuncType base_type;
 			typedef FuncType *ptr_type;
 
+			std::string func_name;
 			const ptr_type func;
-
 			Func(void *lib, const char *name)
-				: func(get_dlsym(lib, name)) {
+				: func_name(name), 
+				  func(get_dlsym(lib, name)) {
 			}
 
 			ptr_type get_dlsym(void *handle, const char *name) const {
 #if TARGET_GCC
 				void *sym;
 				char *error;
+
+				if(handle == nullptr)
+					throw null_library();
 
 				dlerror(); // clear existing
 				sym = dlsym(handle, name);
@@ -57,12 +64,34 @@ namespace C4 {
 #endif
 				return reinterpret_cast<ptr_type>(sym);
 			}
+
 		public:
 			Func(const Library &, const char *name);
+			Func() : func_name("<null_f>"), func(0) { }
+			Func(ptr_type fn) : func_name("<unnamed>"), func(fn) { }
+			Func(ptr_type fn, const char *name)
+				: func_name(name), func(fn) { }
+			virtual ~Func() { }
 
-			template< typename ... Args>
+			template<typename ... Args>
 			auto operator()(Args ... args) {
 				return func(args...);
+			}
+		};
+
+		template<typename FuncType>
+		class NullFunc : public Func<FuncType> {
+		protected:
+			using Func<FuncType>::func_name;
+
+		public:
+			NullFunc() { }
+			NullFunc(const char *name) : Func<FuncType>(name) { }
+			~NullFunc() { }
+
+			template<typename ... Args>
+			auto operator()(Args ... args) {
+				throw null_function(func_name);
 			}
 		};
 
@@ -73,13 +102,15 @@ namespace C4 {
 		public:
 			static const int FLAGS_DEFAULT = RTLD_LAZY;
 
+			Library() : handle(nullptr) { }
 			Library(const char *lib, int flags = FLAGS_DEFAULT) {
 				dlerror(); // clear existing
 				handle = dlopen(lib, flags);
 				if(!handle) throw library_notfound(dlerror());
 			}
 			~Library() {
-				dlclose(handle);
+				if(handle != nullptr)
+					dlclose(handle);
 			}
 
 			template<typename FuncType>
@@ -90,7 +121,9 @@ namespace C4 {
 
 		template<typename FuncType>
 		Func<FuncType>::Func(const Library &lib, const char *name) 
-			: func(get_dlsym(lib.handle, name)) {
+			: func_name(name),
+			  func(get_dlsym(lib.handle, name))
+		{
 		}
 	}
 }

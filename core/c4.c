@@ -38,7 +38,7 @@ int *e, *le,  // current position in emitted code
     debug,    // print executed instructions
     verbose;  // print more detailed info
 // VM symbols
-int *vm_processes, vm_proc_max, vm_proc_count, vm_cycle_count;
+int *vm_processes, *vm_active_process, vm_proc_max, vm_proc_count, vm_cycle_count;
 
 // tokens and classes (operators last and in precedence order)
 enum {
@@ -53,7 +53,11 @@ enum {
 	LEA ,IMM ,JMP ,JSR ,BZ  ,BNZ ,ENT ,ADJ ,LEV ,LI  ,LC  ,SI  ,SC  ,PSH ,
 	OR  ,XOR ,AND ,EQ  ,NE  ,LT  ,GT  ,LE  ,GE  ,SHL ,SHR ,ADD ,SUB ,MUL ,DIV ,MOD ,
 	// C functions
-	OPEN,READ,CLOS,PRTF,DPRT,MALC,FREE,MSET,MCMP,EXIT,FDSZ,PINI,RPTH,
+	OPEN,READ,CLOS,PRTF,DPRT,MALC,FREE,MSET,MCMP,EXIT,FDSZ,
+	// Platform related functions
+	PINI,RPTH,
+	// VM related functions
+	PCHG /* Process changed */,
 	// Extended system calls (handled externally)
 	SYS1,SYS2,SYS3,SYS4,SYSI,
 	// Pointer to last element
@@ -69,6 +73,7 @@ void setup_opcodes() {
 		"SHR ,ADD ,SUB ,MUL ,DIV ,MOD ,"
 		"OPEN,READ,CLOS,PRTF,DPRT,MALC,FREE,MSET,MCMP,EXIT,FDSZ,"
 		"PINI,RPTH,"
+		"PCHG,"
 		"SYS1,SYS2,SYS3,SYS4,SYSI";
 }
 
@@ -82,6 +87,7 @@ void setup_symbols() {
 		"open read close printf dprintf malloc free memset memcmp exit fdsize "
 		// Dynamci runtime platform functions
 		"platform_init runtime_path "
+		"process_changed "
 		// Syscalls
 		"syscall1 syscall2 syscall3 syscall4 syscall_init "
 		// void data type
@@ -109,8 +115,18 @@ enum {
 	B_pc, B_bp, B_sp, B_a, B_cycle,
 	B_i,  B_t, B_halted,
 	B_sym_iop_handler, // invalid operation handler
+	B_platform,        // Platform handle
 	__B
 };
+
+int  *get_vm_active_process() { return vm_active_process; }
+void *get_process_platform(int *process) {
+	return (void*)process[B_platform];
+}
+void  set_process_platform(void *platform, int *process) {
+	//dprintf(STDERR, "Set platform %x on process %x\n", platform, process);
+	process[B_platform] = (int)platform;
+}
 
 // Lookup an item by name in the symbol table
 int *lookup_symbol(char *name, int *symbols) {
@@ -224,7 +240,11 @@ void next()
 				++p; tk = Dec;
 			} else if(*p >= '0' && *p <= '9') {
 				// Handle number and make it negative
-				next(); ival = ival * -1;
+				next();
+				if(tk != Num) // Must be a number
+					tk = 0;
+				else
+					ival = ival * -1;
 			} else
 				tk = Sub;
 			return; 
@@ -442,155 +462,8 @@ void stmt()
 	}
 }
 
-enum { IOP_MISSING = -2, IOP_HANDLED = -1 };
-
-int invalid_opcode_handler(int op, int *process) {
-	if(process[B_sym_iop_handler])
-		return process[B_sym_iop_handler];
-	return IOP_MISSING;
-}
-
-int run_cycle(int *process, int cycles) {
-	int *pc, *sp, *bp, a; // vm registers
-	int cycle, rem_cycle; // cycle counts
-	int i, *t, b; // temps
-
-	if(process[B_magic] != B_MAGIC) {
-		dprintf(STDERR, "Invalid process magic: %d\n", process[B_magic]);
-		process[B_halted] = 1;
-		process[B_exitcode] = -1;
-	}
-
-	if(process[B_halted]) return 1;
-
-	// Load process state
-	pc    = (int*)process[B_pc];
-	sp    = (int*)process[B_sp];
-	bp    = (int*)process[B_bp];
-	a     = process[B_a];
-	cycle = process[B_cycle];
-    rem_cycle = cycles;
-
-	while(--rem_cycle > 0) {
-		i = *pc++; ++cycle;
-		if (debug) {
-		  dprintf(STDERR, "%d> %.4s", cycle, &opcodes[i * 5]);
-		  if (i <= ADJ) dprintf(STDERR, " %d\n", *pc); else dprintf(STDERR, "\n");
-		}
-		// Basic VM operations
-		// LEA: move A, BP + [ptr PC]; inc PC
-		if      (i == LEA) a = (int)(bp + *pc++);                             // load local address
-		// IMM: move A, [ptr PC]; inc PC
-		else if (i == IMM) a = *pc++;                                         // load global address or immediate
-		// JMP: move PC, [ptr PC]
-		else if (i == JMP) pc = (int *)*pc;                                   // jump
-		// JSR: Save next instruction address to stack and set PC to given value
-		//      push PC+1; move PC, [ptr PC]
-		else if (i == JSR) { *--sp = (int)(pc + 1); pc = (int *)*pc; }        // jump to subroutine
-		// BZ : move PC, [A != 0 then PC + 1 else [ptr PC]]
-		else if (i == BZ)  pc = a ? pc + 1 : (int *)*pc;                      // branch if zero
-		// BNZ: move PC, [A != 0 then [ptr PC] else PC + 1]
-		else if (i == BNZ) pc = a ? (int *)*pc : pc + 1;                      // branch if not zero
-		// ENT:
-		//      push BP; move BP, SP; sub SP, [ptr PC]; inc PC
-		else if (i == ENT) { *--sp = (int)bp; bp = sp; sp = sp - *pc++; }     // enter subroutine
-		// ADJ: add SP, [ptr PC]; inc PC
-		else if (i == ADJ) sp = sp + *pc++;                                   // stack adjust
-		else if (i == LEV) { sp = bp; bp = (int *)*sp++; pc = (int *)*sp++; } // leave subroutine
-		else if (i == LI)  a = *(int *)a;                                     // load int
-		else if (i == LC)  a = *(char *)a;                                    // load char
-		else if (i == SI)  *(int *)*sp++ = a;                                 // store int
-		else if (i == SC)  a = *(char *)*sp++ = a;                            // store char
-		else if (i == PSH) *--sp = a;                                         // push
-        // Basic arithmatic operations
-		else if (i == OR)  a = *sp++ |  a;
-		else if (i == XOR) a = *sp++ ^  a;
-		else if (i == AND) a = *sp++ &  a;
-		else if (i == EQ)  a = *sp++ == a;
-		else if (i == NE)  a = *sp++ != a;
-		else if (i == LT)  a = *sp++ <  a;
-		else if (i == GT)  a = *sp++ >  a;
-		else if (i == LE)  a = *sp++ <= a;
-		else if (i == GE)  a = *sp++ >= a;
-		else if (i == SHL) a = *sp++ << a;
-		else if (i == SHR) a = *sp++ >> a;
-		else if (i == ADD) a = *sp++ +  a;
-		else if (i == SUB) a = *sp++ -  a;
-		else if (i == MUL) a = *sp++ *  a;
-		else if (i == DIV) a = *sp++ /  a;
-		else if (i == MOD) a = *sp++ %  a;
-        // C functions as VM operations
-		else if (i == OPEN) a = open((char *)sp[1], *sp);
-		else if (i == READ) a = read(sp[2], (char *)sp[1], *sp);
-		else if (i == CLOS) a = close(*sp);
-		else if (i == PRTF) { t = sp + pc[1]; a = printf((char *)t[-1], t[-2], t[-3], t[-4], t[-5], t[-6]); }
-		else if (i == DPRT) { t = sp + pc[1]; a = dprintf(t[-1], (char *)t[-2], t[-3], t[-4], t[-5], t[-6], t[-7]); }
-		else if (i == MALC) a = (int)malloc(*sp);
-		else if (i == FREE) free((void *)*sp);
-		else if (i == MSET) a = (int)memset((char *)sp[2], sp[1], *sp);
-		else if (i == MCMP) a = memcmp((char *)sp[2], (char *)sp[1], *sp);
-		else if (i == EXIT) {
-			if(verbose) dprintf(STDERR, "exit(%d) cycle = %d\n", *sp, cycle);
-			process[B_halted] = 1;
-			process[B_exitcode] = *sp;
-			rem_cycle = 0;
-		}
-		else if (i == SYS1) { a = (int)syscall1(*sp); }
-		else if (i == SYS2) { a = (int)syscall2(sp[1], *sp); }
-		else if (i == SYS3) { a = (int)syscall3(sp[2], sp[1], *sp); }
-		else if (i == SYS4) { a = (int)syscall4(sp[3], sp[2], sp[1], *sp); }
-		else if (i == SYSI) { a = (int)syscall_init(sp[1], *sp); }
-		else if (i == FDSZ) { a = fdsize(*sp); }
-		else if (i == PINI) { a = platform_init((char*)*sp); }
-		else if (i == RPTH) { a = (int)runtime_path(); }
-		else {
-			b = invalid_opcode_handler(i, process);
-			if(b >= 0) {
-				// TODO: setup call to handler
-			} else if(b == IOP_HANDLED) {
-				// Do nothing
-			} else if(b == IOP_MISSING) {
-				dprintf(STDERR, "unknown instruction = %d! cycle = %d\n", i, cycle);
-				process[B_halted] = 1;
-				process[B_exitcode] = -1;
-				rem_cycle = 0;
-			}
-		}
-	}
-
-	// Save process state
-	process[B_pc] = (int)pc;
-	process[B_sp] = (int)sp;
-	process[B_bp] = (int)bp;
-	process[B_a] = a;
-	process[B_cycle] = cycle;
-
-	return process[B_halted];
-}
-
-int *create_process(char *source, int argc, char **argv) {
-	int *bp, *sp, *pc;
-	int *t, i, bt, ty;
-	int *process, *idmain, poolsz;
-	poolsz = 256*1024; // arbitrary size
-
-	if (!(process = (int*)malloc(__B * sizeof(int*)))) { dprintf(STDERR, "Could not malloc(%d) process space\n", __B); return 0; }
-
-	// Reset globals
-	if (!(sym = malloc(poolsz))) { dprintf(STDERR, "could not malloc(%d) symbol area\n", poolsz); return 0; }
-	if (!(le = e = malloc(poolsz))) { dprintf(STDERR, "could not malloc(%d) text area\n", poolsz); return 0; }
-	if (!(data = malloc(poolsz))) { dprintf(STDERR, "could not malloc(%d) data area\n", poolsz); return 0; }
-	if (!(sp = malloc(poolsz))) { dprintf(STDERR, "could not malloc(%d) stack area\n", poolsz); return 0; }
-
-	process[B_p_sym] = (int)sym;
-	process[B_p_e] = (int)e;
-	process[B_p_data] = (int)data;
-	process[B_p_sp] = (int)sp;
-
-	memset(sym,  0, poolsz);
-	memset(e,    0, poolsz);
-	memset(data, 0, poolsz);
-
+int parse(char *source) {
+	int i, bt, ty;
 	setup_symbols();
 
 	i = Char; while (i <= While) { next(); id[Tk] = i++; } // add keywords to symbol table
@@ -696,6 +569,172 @@ int *create_process(char *source, int argc, char **argv) {
 		next();
 	}
 
+	return 1;
+}
+
+// VM processing
+enum { IOP_MISSING = -2, IOP_HANDLED = -1 };
+
+int invalid_opcode_handler(int op, int *process) {
+	if(process[B_sym_iop_handler])
+		return process[B_sym_iop_handler];
+	return IOP_MISSING;
+}
+
+void change_process(int *process) {
+	vm_active_process = process;
+	process_changed(process);
+}
+
+int run_cycle(int *process, int cycles) {
+	int *pc, *sp, *bp, a; // vm registers
+	int cycle, rem_cycle; // cycle counts
+	int i, *t, b; // temps
+
+	if(process[B_magic] != B_MAGIC) {
+		dprintf(STDERR, "Invalid process magic: %d\n", process[B_magic]);
+		process[B_halted] = 1;
+		process[B_exitcode] = -1;
+	}
+
+	if(process[B_halted]) return 1;
+
+	// Load process state
+	pc    = (int*)process[B_pc];
+	sp    = (int*)process[B_sp];
+	bp    = (int*)process[B_bp];
+	a     = process[B_a];
+	cycle = process[B_cycle];
+    rem_cycle = cycles;
+	change_process(process);
+
+	while(--rem_cycle > 0) {
+		i = *pc++; ++cycle;
+		if (debug) {
+		  dprintf(STDERR, "%d> %.4s", cycle, &opcodes[i * 5]);
+		  if (i <= ADJ) dprintf(STDERR, " %d\n", *pc); else dprintf(STDERR, "\n");
+		}
+		// Basic VM operations
+		// LEA: move A, BP + [ptr PC]; inc PC
+		if      (i == LEA) a = (int)(bp + *pc++);                             // load local address
+		// IMM: move A, [ptr PC]; inc PC
+		else if (i == IMM) a = *pc++;                                         // load global address or immediate
+		// JMP: move PC, [ptr PC]
+		else if (i == JMP) pc = (int *)*pc;                                   // jump
+		// JSR: Save next instruction address to stack and set PC to given value
+		//      push PC+1; move PC, [ptr PC]
+		else if (i == JSR) { *--sp = (int)(pc + 1); pc = (int *)*pc; }        // jump to subroutine
+		// BZ : move PC, [A != 0 then PC + 1 else [ptr PC]]
+		else if (i == BZ)  pc = a ? pc + 1 : (int *)*pc;                      // branch if zero
+		// BNZ: move PC, [A != 0 then [ptr PC] else PC + 1]
+		else if (i == BNZ) pc = a ? (int *)*pc : pc + 1;                      // branch if not zero
+		// ENT:
+		//      push BP; move BP, SP; sub SP, [ptr PC]; inc PC
+		else if (i == ENT) { *--sp = (int)bp; bp = sp; sp = sp - *pc++; }     // enter subroutine
+		// ADJ: add SP, [ptr PC]; inc PC
+		else if (i == ADJ) sp = sp + *pc++;                                   // stack adjust
+		else if (i == LEV) { sp = bp; bp = (int *)*sp++; pc = (int *)*sp++; } // leave subroutine
+		else if (i == LI)  a = *(int *)a;                                     // load int
+		else if (i == LC)  a = *(char *)a;                                    // load char
+		else if (i == SI)  *(int *)*sp++ = a;                                 // store int
+		else if (i == SC)  a = *(char *)*sp++ = a;                            // store char
+		else if (i == PSH) *--sp = a;                                         // push
+        // Basic arithmatic operations
+		else if (i == OR)  a = *sp++ |  a;
+		else if (i == XOR) a = *sp++ ^  a;
+		else if (i == AND) a = *sp++ &  a;
+		else if (i == EQ)  a = *sp++ == a;
+		else if (i == NE)  a = *sp++ != a;
+		else if (i == LT)  a = *sp++ <  a;
+		else if (i == GT)  a = *sp++ >  a;
+		else if (i == LE)  a = *sp++ <= a;
+		else if (i == GE)  a = *sp++ >= a;
+		else if (i == SHL) a = *sp++ << a;
+		else if (i == SHR) a = *sp++ >> a;
+		else if (i == ADD) a = *sp++ +  a;
+		else if (i == SUB) a = *sp++ -  a;
+		else if (i == MUL) a = *sp++ *  a;
+		else if (i == DIV) a = *sp++ /  a;
+		else if (i == MOD) a = *sp++ %  a;
+        // C functions as VM operations
+		else if (i == OPEN) a = open((char *)sp[1], *sp);
+		else if (i == READ) a = read(sp[2], (char *)sp[1], *sp);
+		else if (i == CLOS) a = close(*sp);
+		else if (i == PRTF) { t = sp + pc[1]; a = printf((char *)t[-1], t[-2], t[-3], t[-4], t[-5], t[-6]); }
+		else if (i == DPRT) { t = sp + pc[1]; a = dprintf(t[-1], (char *)t[-2], t[-3], t[-4], t[-5], t[-6], t[-7]); }
+		else if (i == MALC) a = (int)malloc(*sp);
+		else if (i == FREE) free((void *)*sp);
+		else if (i == MSET) a = (int)memset((char *)sp[2], sp[1], *sp);
+		else if (i == MCMP) a = memcmp((char *)sp[2], (char *)sp[1], *sp);
+		else if (i == EXIT) {
+			if(verbose) dprintf(STDERR, "exit(%d) cycle = %d\n", *sp, cycle);
+			process[B_halted] = 1;
+			process[B_exitcode] = *sp;
+			rem_cycle = 0;
+		}
+		else if (i == SYS1) { a = (int)syscall1(*sp); }
+		else if (i == SYS2) { a = (int)syscall2(sp[1], *sp); }
+		else if (i == SYS3) { a = (int)syscall3(sp[2], sp[1], *sp); }
+		else if (i == SYS4) { a = (int)syscall4(sp[3], sp[2], sp[1], *sp); }
+		else if (i == SYSI) { a = (int)syscall_init(sp[1], *sp); }
+		else if (i == FDSZ) { a = fdsize(*sp); }
+		else if (i == PINI) { a = platform_init((char*)*sp); }
+		else if (i == RPTH) { a = (int)runtime_path((char*)*sp); }
+		else if (i == PCHG) { process_changed((int*)*sp); }
+		else {
+			b = invalid_opcode_handler(i, process);
+			if(b >= 0) {
+				// TODO: setup call to handler
+			} else if(b == IOP_HANDLED) {
+				// Do nothing
+			} else if(b == IOP_MISSING) {
+				dprintf(STDERR, "unknown instruction = %d! cycle = %d\n", i, cycle);
+				process[B_halted] = 1;
+				process[B_exitcode] = -1;
+				rem_cycle = 0;
+			}
+		}
+	}
+
+	// Save process state
+	process[B_pc] = (int)pc;
+	process[B_sp] = (int)sp;
+	process[B_bp] = (int)bp;
+	process[B_a] = a;
+	process[B_cycle] = cycle;
+	vm_active_process = 0;
+
+	return process[B_halted];
+}
+
+int *create_process(char *source, int argc, char **argv) {
+	int *bp, *sp, *pc;
+	int *t;
+	int *process, *idmain, poolsz;
+	poolsz = 256*1024; // arbitrary size
+
+	if (!(process = (int*)malloc(__B * sizeof(int*)))) { dprintf(STDERR, "Could not malloc(%d) process space\n", __B); return 0; }
+
+	// Reset globals
+	if (!(sym = malloc(poolsz))) { dprintf(STDERR, "could not malloc(%d) symbol area\n", poolsz); return 0; }
+	if (!(le = e = malloc(poolsz))) { dprintf(STDERR, "could not malloc(%d) text area\n", poolsz); return 0; }
+	if (!(data = malloc(poolsz))) { dprintf(STDERR, "could not malloc(%d) data area\n", poolsz); return 0; }
+	if (!(sp = malloc(poolsz))) { dprintf(STDERR, "could not malloc(%d) stack area\n", poolsz); return 0; }
+
+	process[B_p_sym] = (int)sym;
+	process[B_p_e] = (int)e;
+	process[B_p_data] = (int)data;
+	process[B_p_sp] = (int)sp;
+
+	memset(sym,  0, poolsz);
+	memset(e,    0, poolsz);
+	memset(data, 0, poolsz);
+
+	if(!parse(source)) {
+		dprintf(STDERR, "Failed to pase source\n");
+		return 0;
+	}
+
 	idmain = lookup_symbol("main", sym);
 	if (!idmain) { dprintf(STDERR, "main() not defined\n"); return 0; }
 	pc = (int *)idmain[Val];
@@ -742,15 +781,23 @@ int *create_process(char *source, int argc, char **argv) {
 	process[B_a] = 0;
 	process[B_cycle] = 0;
 	process[B_halted] = 0;
+	process[B_platform] = 0;
 
 	return process;
 }
 
 void free_process(int *process) {
+	int *tmp;
+
 	if(process[B_magic] != B_MAGIC) {
 		printf("free_process(): invalid magic\n");
 		return;
 	}
+
+	tmp = vm_active_process;
+	change_process(process);
+	platform_init(0);
+	vm_active_process = tmp;
 
 	process[B_magic] = 0;
 	free((void*)process[B_p_e]);
@@ -760,26 +807,24 @@ void free_process(int *process) {
 	free((void*)process);
 }
 
-// Extra library stuff
-char *get_runtime() {
-	return runtime_path();
-}
-
 #if 0
 // Dummy value for when c5.c is run indirectly
 enum { SYS3_LISP_MAIN };
 #endif
 
 int c5_lispmain(int argc, char **argv) {
+	int result;
 #if 0
 	dprintf(STDERR, "Indirect call to c5_lispmain not supported\n");
 	return 1;
 #endif
 	// Runtime not loaded, load it
-	if(platform_init(get_runtime())) {
+	if(platform_init(runtime_path("scheme"))) {
 		return 1;
 	}
-	return syscall3(SYS3_LISP_MAIN, argc, (int)argv);
+	result = syscall3(SYS3_LISP_MAIN, argc, (int)argv);
+	platform_init(0);
+	return result;
 }
 
 // Override name when compiling natively
@@ -805,6 +850,7 @@ int main(int argc, char **argv)
 	vm_proc_count = 0;
 	if (!(vm_processes = (int*)malloc(vm_proc_max * sizeof(int*)))) { dprintf(STDERR, "Failed to allocate vm_processes area\n"); return -1; }
 	memset(vm_processes, 0, vm_proc_max * sizeof(int*));
+	vm_active_process = 0;
 
 	--argc; ++argv;
 	early_param_exit = 0; // when to exit parameter parsing
@@ -860,14 +906,6 @@ int main(int argc, char **argv)
 	if (vm_proc_count < 1 && argc < 1) { free(vm_processes); dprintf(STDERR, "usage: c5 [-L] [-s] [-d] [-v] [-c nnn] [-r file] file args...\n"); return -1; }
 	// Only add next arg as process if early parameter parsing was not invoked
 	if (early_param_exit == 0 && argc > 0) vm_processes[vm_proc_count++] = (int)*argv;
-
-	// Start runtime
-	if(verbose) dprintf(STDERR, "Load runtime: %s\n", get_runtime());
-	if(platform_init(get_runtime())) {
-		free(vm_processes);
-		return 1;
-	}
-
 
 	// Start all vm_processes
 	i = 0;

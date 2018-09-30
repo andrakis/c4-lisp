@@ -75,7 +75,7 @@
           <incDir>
             <pElem>include</pElem>
           </incDir>
-          <commandLine>-Wno-format -rdynamic -Wall -Werror</commandLine>
+          <commandLine>-Wno-format -rdynamic -Wall</commandLine>
           <preprocessorList>
             <Elem>CPP14</Elem>
             <Elem>DEBUG</Elem>

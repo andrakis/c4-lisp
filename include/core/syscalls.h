@@ -6,6 +6,8 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+	void process_changed(NUMTYPE *process);
+
 	NUMTYPE platform_init(const char *runtime) NOEXCEPT;
 
 	NUMTYPE syscall1(NUMTYPE);

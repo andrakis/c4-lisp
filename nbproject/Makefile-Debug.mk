@@ -45,8 +45,8 @@ OBJECTFILES= \
 CFLAGS=-Wno-format -rdynamic
 
 # CC Compiler Flags
-CCFLAGS=-Wno-format -rdynamic -Wall -Werror
-CXXFLAGS=-Wno-format -rdynamic -Wall -Werror
+CCFLAGS=-Wno-format -rdynamic -Wall
+CXXFLAGS=-Wno-format -rdynamic -Wall
 
 # Fortran Compiler Flags
 FFLAGS=

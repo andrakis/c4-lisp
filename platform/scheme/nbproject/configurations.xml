@@ -52,7 +52,7 @@
           <incDir>
             <pElem>../../include</pElem>
           </incDir>
-          <commandLine>-Wno-format -rdynamic -Wall -Werror</commandLine>
+          <commandLine>-Wno-format -rdynamic -Wall -Werror -Wno-error=unused-function</commandLine>
           <preprocessorList>
             <Elem>DEBUG</Elem>
             <Elem>GCC_RDYNAMIC</Elem>
@@ -64,7 +64,7 @@
           <incDir>
             <pElem>../../include</pElem>
           </incDir>
-          <commandLine>-Wno-format -rdynamic -Wall -Werror</commandLine>
+          <commandLine>-Wno-format -rdynamic -Wall -Werror -Wno-error=unused-function</commandLine>
           <preprocessorList>
             <Elem>CPP14</Elem>
             <Elem>DEBUG</Elem>
