@@ -822,6 +822,8 @@ int c5_lispmain(int argc, char **argv) {
 	if(platform_init(runtime_path("scheme"))) {
 		return 1;
 	}
+	if(debug)
+		dprintf(STDERR, "calling syscall3(SYS3_LISP_MAP, %ld, %x)\n", argc, (void*)argv);
 	result = syscall3(SYS3_LISP_MAIN, argc, (int)argv);
 	platform_init(0);
 	return result;

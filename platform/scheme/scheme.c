@@ -219,7 +219,7 @@ void *proc_invoke(void *exps, void *proc, void *dest) {
 	return (void*)syscall4(SYS4_CALL_PROC, (int)exps, (int)proc, (int)dest);
 }
 
-int parse(char *code, void *dest) {
+int lisp_parse(char *code, void *dest) {
 	return syscall3(SYS3_PARSE, (int)code, (int)dest);
 }
 
@@ -469,7 +469,7 @@ int main(int argc, char **argv)
 	}
 	
 	tokens = cell_new();
-	if(parse(code, tokens)) {
+	if(lisp_parse(code, tokens)) {
 		printf("Failed to parse code: %s\n", code);
 		return 1;
 	}

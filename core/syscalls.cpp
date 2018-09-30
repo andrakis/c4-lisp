@@ -1,11 +1,19 @@
 //
 #include <stdlib.h>
 #include <stdio.h>
+#include <map>
 
 #include "core/native.h"
 #include "core/extras.h"
 #include "core/syscalls.h"
 #include "core/solar.hpp"
+
+#define VERBOSE 0
+#if VERBOSE
+#define VERB(Code) Code
+#else
+#define VERB(Code)
+#endif
 
 #ifndef NUMTYPE
 #define NUMTYPE long
@@ -36,7 +44,26 @@ NUMTYPE null_sys4(NUMTYPE sig, NUMTYPE arg1, NUMTYPE arg2, NUMTYPE arg3) {
 	throw Solar::null_function("syscall4");
 }
 
-struct platform_runtime {
+#if VERBOSE
+struct verbose_constructors {
+	verbose_constructors(const char *name) : _name(name) {
+		dprintf(2, "vv: new %s()\n", _name);
+	}
+	virtual ~verbose_constructors() {
+		dprintf(2, "vv: ~%s()\n", _name);
+	}
+private:
+	const char *_name;
+};
+
+#define VERBOSE_CONSTRUCTORS(Name) verbose_constructors(Name),
+#define VERBOSE_CONSTRUCTORS_INHERIT : verbose_constructors
+#else
+#define VERBOSE_CONSTRUCTORS(Name)
+#define VERBOSE_CONSTRUCTORS_INHERIT
+#endif
+
+struct platform_runtime VERBOSE_CONSTRUCTORS_INHERIT {
 	Solar::Library rtl;
 	Solar::Func<syscall_init_t> syscall_init_f;
 	Solar::Func<syscall1_t> syscall1_f;
@@ -45,7 +72,8 @@ struct platform_runtime {
 	Solar::Func<syscall4_t> syscall4_f;
 
 	platform_runtime()
-		: rtl(),
+		: VERBOSE_CONSTRUCTORS("platform_runtime")
+		  rtl(),
 		  syscall_init_f(null_init),
 		  syscall1_f(null_sys1),
 		  syscall2_f(null_sys2),
@@ -54,7 +82,8 @@ struct platform_runtime {
 	{ }
 
 	platform_runtime(const char *runtime)
-		: rtl(runtime),
+		: VERBOSE_CONSTRUCTORS("platform_runtime")
+		  rtl(runtime),
 		  syscall_init_f(rtl, "syscall_init"),
 		  syscall1_f(rtl, "syscall1"),
 		  syscall2_f(rtl, "syscall2"),
@@ -65,10 +94,39 @@ struct platform_runtime {
 };
 
 struct platform_runtime  null_runtime;
-struct platform_runtime *syscalls_runtime = &null_runtime;
+struct platform_runtime *syscalls_runtime;
+
+class runtime_map {
+	typedef std::map<std::string,platform_runtime*> runtimes_map;
+
+	runtimes_map runtimes;
+	
+public:
+	runtime_map() {
+		VERB(dprintf(2, "runtime_map()\n"));
+	}
+	~runtime_map() {
+		VERB(dprintf(2, "~runtime_map()\n"));
+		for(auto it = runtimes.begin(); it != runtimes.end(); ++it) {
+			if(it->second == &null_runtime) continue;
+			VERB(dprintf(2, "~runtime_map.delete(%s)\n", it->first.c_str()));
+			delete it->second;
+		}
+	}
+	bool empty() const { return runtimes.cbegin() != runtimes.cend(); }
+	auto emplace(std::string name, platform_runtime *runtime) {
+		return runtimes.emplace(name, runtime);
+	}
+	auto operator[](const std::string &name) {
+		return runtimes[name];
+	}
+} runtimes;
 
 void process_changed(NUMTYPE *process) {
-	void *platform = get_process_platform(process);
+	void *platform = 0;
+	
+	if(process != 0)
+		platform = get_process_platform(process);
 	if(platform == 0)
 		syscalls_runtime = &null_runtime;
 	else
@@ -78,19 +136,32 @@ void process_changed(NUMTYPE *process) {
 NUMTYPE platform_init(const char *runtime) noexcept {
 	NUMTYPE *p;
 
-	//dprintf(2, "platform_init(%s)\n", runtime);
+	if(runtimes.empty()) {
+		// First init. Fixes issue with compilation on OR1000
+		VERB(dprintf(2, "platform_init() first run\n"));
+		runtimes.emplace("null", &null_runtime);
+		syscalls_runtime = &null_runtime;
+	}
+
+	VERB(dprintf(2, "platform_init(%s)\n", runtime));
 	try {
 		if(runtime) {
+			VERB(dprintf(2, "  new platform_runtime(%s)\n", runtime));
 			syscalls_runtime = new platform_runtime(runtime);
+			if(syscalls_runtime) {
+				VERB(dprintf(2, "  emplace runtime\n"));
+				runtimes.emplace(std::string(runtime), syscalls_runtime);
+			}
 		} else {
-			// free current runtime
-			if(syscalls_runtime != &null_runtime)
-				delete syscalls_runtime;
+			VERB(dprintf(2, "  setting syscalls_runtime to null runtime\n"));
 			syscalls_runtime = &null_runtime;
 		}
-		p = get_vm_active_process();
-		if(p)
+		
+		if((p = get_vm_active_process())) {
+			VERB(dprintf(2, "  setting process platform\n"));
 			set_process_platform(syscalls_runtime, p);
+		}
+		VERB(dprintf(2, "platform_init() complete\n"));
 		return 0;
 	} catch (Solar::library_notfound lnf) {
 		dprintf(2, "Cannot load platform: %s\n", lnf.what());
