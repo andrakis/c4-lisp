@@ -66,6 +66,7 @@
           </incDir>
           <commandLine>-Wno-format -rdynamic</commandLine>
           <preprocessorList>
+            <Elem>CND_PLATFORM="${CND_PLATFORM}"</Elem>
             <Elem>DEBUG</Elem>
             <Elem>GCC_RDYNAMIC</Elem>
           </preprocessorList>
@@ -77,6 +78,7 @@
           </incDir>
           <commandLine>-Wno-format -rdynamic -Wall</commandLine>
           <preprocessorList>
+            <Elem>CND_PLATFORM="${CND_PLATFORM}"</Elem>
             <Elem>CPP14</Elem>
             <Elem>DEBUG</Elem>
             <Elem>GCC_RDYNAMIC</Elem>
@@ -146,6 +148,7 @@
           </incDir>
           <commandLine>-Wno-format</commandLine>
           <preprocessorList>
+            <Elem>CND_PLATFORM="${CND_PLATFORM}"</Elem>
             <Elem>NDEBUG</Elem>
             <Elem>RELEASE</Elem>
           </preprocessorList>
@@ -158,6 +161,7 @@
           </incDir>
           <commandLine>-Wno-format</commandLine>
           <preprocessorList>
+            <Elem>CND_PLATFORM="${CND_PLATFORM}"</Elem>
             <Elem>CPP14</Elem>
             <Elem>NDEBUG</Elem>
             <Elem>RELEASE</Elem>

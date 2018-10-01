@@ -68,22 +68,22 @@ ${CND_DISTDIR}/${CND_CONF}/${CND_PLATFORM}/lisp4: ${OBJECTFILES}
 ${OBJECTDIR}/core/c4.o: core/c4.c 
 	${MKDIR} -p ${OBJECTDIR}/core
 	${RM} "$@.d"
-	$(COMPILE.c) -O2 -DNDEBUG -DRELEASE -Iinclude -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/core/c4.o core/c4.c
+	$(COMPILE.c) -O2 -DNDEBUG -DRELEASE -DCND_PLATFORM=\"${CND_PLATFORM}\" -Iinclude -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/core/c4.o core/c4.c
 
 ${OBJECTDIR}/core/extras.o: core/extras.c 
 	${MKDIR} -p ${OBJECTDIR}/core
 	${RM} "$@.d"
-	$(COMPILE.c) -O2 -DNDEBUG -DRELEASE -Iinclude -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/core/extras.o core/extras.c
+	$(COMPILE.c) -O2 -DNDEBUG -DRELEASE -DCND_PLATFORM=\"${CND_PLATFORM}\" -Iinclude -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/core/extras.o core/extras.c
 
 ${OBJECTDIR}/core/main.o: core/main.cpp 
 	${MKDIR} -p ${OBJECTDIR}/core
 	${RM} "$@.d"
-	$(COMPILE.cc) -O2 -DCPP14 -DNDEBUG -DRELEASE -Iinclude -std=c++14 -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/core/main.o core/main.cpp
+	$(COMPILE.cc) -O2 -DCPP14 -DNDEBUG -DRELEASE -DCND_PLATFORM=\"${CND_PLATFORM}\" -Iinclude -std=c++14 -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/core/main.o core/main.cpp
 
 ${OBJECTDIR}/core/syscalls.o: core/syscalls.cpp 
 	${MKDIR} -p ${OBJECTDIR}/core
 	${RM} "$@.d"
-	$(COMPILE.cc) -O2 -DCPP14 -DNDEBUG -DRELEASE -Iinclude -std=c++14 -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/core/syscalls.o core/syscalls.cpp
+	$(COMPILE.cc) -O2 -DCPP14 -DNDEBUG -DRELEASE -DCND_PLATFORM=\"${CND_PLATFORM}\" -Iinclude -std=c++14 -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/core/syscalls.o core/syscalls.cpp
 
 # Subprojects
 .build-subprojects:

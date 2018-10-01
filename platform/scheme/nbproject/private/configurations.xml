@@ -2,7 +2,7 @@
 <configurationDescriptor version="97">
   <projectmakefile>Makefile</projectmakefile>
   <confs>
-    <conf name="Debug" type="2">
+    <conf name="Debug" type="2" platformSpecific="true">
       <toolsSet>
         <developmentServer>localhost</developmentServer>
         <platform>2</platform>
@@ -35,7 +35,7 @@
         </environment>
       </runprofile>
     </conf>
-    <conf name="Release" type="2">
+    <conf name="Release" type="2" platformSpecific="true">
       <toolsSet>
         <developmentServer>localhost</developmentServer>
         <platform>2</platform>

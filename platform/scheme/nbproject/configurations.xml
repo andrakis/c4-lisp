@@ -41,11 +41,12 @@
   </sourceRootList>
   <projectmakefile>Makefile</projectmakefile>
   <confs>
-    <conf name="Debug" type="2">
+    <conf name="Debug" type="2" platformSpecific="true">
       <toolsSet>
         <compilerSet>default</compilerSet>
+        <platform>2</platform>
         <dependencyChecking>true</dependencyChecking>
-        <rebuildPropChanged>false</rebuildPropChanged>
+        <rebuildPropChanged>true</rebuildPropChanged>
       </toolsSet>
       <compileType>
         <cTool>
@@ -54,6 +55,7 @@
           </incDir>
           <commandLine>-Wno-format -rdynamic -Wall -Werror -Wno-error=unused-function</commandLine>
           <preprocessorList>
+            <Elem>CND_PLATFORM="${CND_PLATFORM}"</Elem>
             <Elem>DEBUG</Elem>
             <Elem>GCC_RDYNAMIC</Elem>
           </preprocessorList>
@@ -66,13 +68,14 @@
           </incDir>
           <commandLine>-Wno-format -rdynamic -Wall -Werror -Wno-error=unused-function</commandLine>
           <preprocessorList>
+            <Elem>CND_PLATFORM="${CND_PLATFORM}"</Elem>
             <Elem>CPP14</Elem>
             <Elem>DEBUG</Elem>
             <Elem>RDYNAMIC</Elem>
           </preprocessorList>
         </ccTool>
         <linkerTool>
-          <output>../../rtl/${CND_PLATFORM}/libscheme.${CND_CONF}.${CND_DLIB_EXT}</output>
+          <output>../../lib/libscheme.${CND_CONF}-${CND_PLATFORM}.${CND_DLIB_EXT}</output>
         </linkerTool>
       </compileType>
       <item path="../../include/platform/scheme/cell.h"
@@ -94,11 +97,12 @@
       <item path="syscalls.c" ex="false" tool="0" flavor2="0">
       </item>
     </conf>
-    <conf name="Release" type="2">
+    <conf name="Release" type="2" platformSpecific="true">
       <toolsSet>
         <compilerSet>default</compilerSet>
+        <platform>2</platform>
         <dependencyChecking>true</dependencyChecking>
-        <rebuildPropChanged>false</rebuildPropChanged>
+        <rebuildPropChanged>true</rebuildPropChanged>
       </toolsSet>
       <compileType>
         <cTool>
@@ -108,6 +112,7 @@
           </incDir>
           <commandLine>-Wno-format</commandLine>
           <preprocessorList>
+            <Elem>CND_PLATFORM="${CND_PLATFORM}"</Elem>
             <Elem>NDEBUG</Elem>
             <Elem>RELEASE</Elem>
           </preprocessorList>
@@ -120,6 +125,7 @@
           </incDir>
           <commandLine>-Wno-format</commandLine>
           <preprocessorList>
+            <Elem>CND_PLATFORM="${CND_PLATFORM}"</Elem>
             <Elem>CPP14</Elem>
             <Elem>NDEBUG</Elem>
             <Elem>RELEASE</Elem>
@@ -132,7 +138,7 @@
           <developmentMode>5</developmentMode>
         </asmTool>
         <linkerTool>
-          <output>../../rtl/${CND_PLATFORM}/libscheme.${CND_CONF}.${CND_DLIB_EXT}</output>
+          <output>../../lib/libscheme.${CND_CONF}-${CND_PLATFORM}.${CND_DLIB_EXT}</output>
         </linkerTool>
       </compileType>
       <item path="../../include/platform/scheme/cell.h"

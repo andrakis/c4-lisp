@@ -10,15 +10,15 @@ NUMTYPE fdsize (int fd) {
 	return st.st_size;
 }
 
-#define RTL "rtl"
+#define RTL "lib"
 #define MAX_PATH 1024
 
-//#define runtime_path(LIB) RTL "/" CND_PLATFORM "/lib" LIB "." CND_CONF "." RTL_SO
+// RTL "/lib" LIB "." CND_CONF "-" CND_PLATFORM "." RTL_SO
 char *runtime_path(char *lib) {
 	static char path_buf[MAX_PATH];
 	char *p = path_buf;
 
 	// TODO: insecure
-	sprintf(p, "%s/%s/lib%s.%s.%s", RTL, CND_PLATFORM, lib, CND_CONF, RTL_SO);
+	sprintf(p, "%s/lib%s.%s-%s.%s", RTL, lib, CND_CONF, CND_PLATFORM, RTL_SO);
 	return p;
 }
