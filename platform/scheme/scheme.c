@@ -424,7 +424,7 @@ int main(int argc, char **argv)
 	// setup globals
 	debug = 0;
 	//code = "(print (quote Hello))";
-	code = "(print (quote Two plus 2 is) (+ 1 1))";
+	code = "(print (quote Two plus 2 is) (+ 2 2))";
 	--argc; ++argv;
 	parse_args(argc, argv);
 
