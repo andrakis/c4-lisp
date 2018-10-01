@@ -13,12 +13,13 @@ NUMTYPE fdsize (int fd) {
 #define RTL "lib"
 #define MAX_PATH 1024
 
+char path_buf[MAX_PATH];
+
 // RTL "/lib" LIB "." CND_CONF "-" CND_PLATFORM "." RTL_SO
 char *runtime_path(char *lib) {
-	static char path_buf[MAX_PATH];
 	char *p = path_buf;
 
-	// TODO: insecure
-	sprintf(p, "%s/lib%s.%s-%s.%s", RTL, lib, CND_CONF, CND_PLATFORM, RTL_SO);
+	snprintf(p, MAX_PATH, "%s/lib%s.%s-%s.%s", RTL, lib, CND_CONF, CND_PLATFORM, RTL_SO);
+	p[MAX_PATH] = 0;
 	return p;
 }

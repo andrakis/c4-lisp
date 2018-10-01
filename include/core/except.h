@@ -16,14 +16,15 @@
 
 namespace C4 {
 	class generic_exception : public std::exception {
-		std::string message;
+		std::string _message;
 
 	public:
-		generic_exception(const char *msg) : message(msg) {
-		}
-		generic_exception(const std::string msg) : message(msg) {
-		}
-		const char *what() const noexcept { return message.c_str(); }
+		generic_exception(const std::string name)
+			: _message(name) { }
+
+		generic_exception(const std::string name, const std::string message)
+			: _message(name + ": " + message) { }
+		const char *what() const noexcept { return _message.c_str(); }
 	};
 
 #define QUOTE(Val) #Val
@@ -31,9 +32,8 @@ namespace C4 {
 #define GENERIC_EXCEPTION(Name) \
 	class Name : public generic_exception { \
 	public: \
-	Name() : generic_exception(QUOTE(Name)) { } \
-	Name(const char *msg) : generic_exception(msg) { } \
-	Name(std::string msg) : generic_exception(msg) { } \
+	Name() : generic_exception(QUOTE(Name), QUOTE(Name)) { } \
+	Name(std::string msg) : generic_exception(QUOTE(Name), msg) { } \
 	};
 }
 

@@ -109,11 +109,17 @@ public:
 		VERB(dprintf(2, "~runtime_map()\n"));
 		for(auto it = runtimes.begin(); it != runtimes.end(); ++it) {
 			if(it->second == &null_runtime) continue;
-			VERB(dprintf(2, "~runtime_map.delete(%s)\n", it->first.c_str()));
+			VERB(dprintf(2, "  ~runtime_map.delete(%s)\n", it->first.c_str()));
 			delete it->second;
 		}
 	}
 	bool empty() const { return runtimes.cbegin() != runtimes.cend(); }
+	bool has_key(std::string name) const {
+		runtimes_map::const_iterator it;
+
+		it = runtimes.find(name);
+		return it != runtimes.cend();
+	}
 	auto emplace(std::string name, platform_runtime *runtime) {
 		return runtimes.emplace(name, runtime);
 	}
@@ -130,7 +136,7 @@ void process_changed(NUMTYPE *process) {
 	if(platform == 0)
 		syscalls_runtime = &null_runtime;
 	else
-		syscalls_runtime = (platform_runtime*)platform;
+		syscalls_runtime = reinterpret_cast<platform_runtime*>(platform);
 }
 
 NUMTYPE platform_init(const char *runtime) noexcept {
@@ -146,9 +152,11 @@ NUMTYPE platform_init(const char *runtime) noexcept {
 	VERB(dprintf(2, "platform_init(%s)\n", runtime));
 	try {
 		if(runtime) {
-			VERB(dprintf(2, "  new platform_runtime(%s)\n", runtime));
-			syscalls_runtime = new platform_runtime(runtime);
-			if(syscalls_runtime) {
+			if(runtimes.has_key(runtime)) {
+				syscalls_runtime = runtimes[runtime];
+			} else {
+				VERB(dprintf(2, "  new platform_runtime(%s)\n", runtime));
+				syscalls_runtime = new platform_runtime(runtime);
 				VERB(dprintf(2, "  emplace runtime\n"));
 				runtimes.emplace(std::string(runtime), syscalls_runtime);
 			}
