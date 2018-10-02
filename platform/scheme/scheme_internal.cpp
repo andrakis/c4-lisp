@@ -206,14 +206,24 @@ NUMTYPE c_env_lookup(NUMTYPE _cell, NUMTYPE _env) {
 }
 
 // return (*env)[x.list[1].val] = eval(x.list[2], env);
-NUMTYPE c_env_set(const char *_name, NUMTYPE _value, NUMTYPE _env) {
-	std::string name(_name);
+NUMTYPE c_env_set(NUMTYPE _name, NUMTYPE _value, NUMTYPE _env) {
+	cell *name = CELL(_name);
+	cell *value = CELL(_value);
 	env_p *ep = ENV_P(_env);
 	environment *env = ep->get();
-	cell *value = (cell*)_value;
 
-	(*env)[name] = *value;
-	return OBJ_TO_C(&(*env)[name]);
+	(*env)[name->val] = *value;
+	return OBJ_TO_C(&(*env)[name->val]);
+}
+
+NUMTYPE c_env_newargs(NUMTYPE _names, NUMTYPE _values, NUMTYPE _parent) {
+	const cell *names = CELL(_names);
+	const cells *values = CELLS(_values);
+	env_p *parent = ENV_P(_parent);
+
+	environment *env = new environment(*names, *values, *parent);
+	env_p *p = new env_p(env);
+	return OBJ_TO_C(p);
 }
 
 ////////////////////// built-in primitive procedures
@@ -535,12 +545,17 @@ cell atom(const std::string & token)
 // return the Lisp expression in the given tokens
 cell read_from(std::list<std::string> & tokens)
 {
+	if(tokens.empty()) throw std::exception();
+
 	const std::string token(tokens.front());
 	tokens.pop_front();
 	if (token == "(") {
 		cell c(List);
-		while (tokens.front() != ")")
+		while (tokens.front() != ")") {
 			c.list.push_back(read_from(tokens));
+			if(tokens.empty()) throw std::exception();
+		}
+		if(tokens.empty()) throw std::exception();
 		tokens.pop_front();
 		return c;
 	}
@@ -569,7 +584,7 @@ std::string to_string(const cells &exp);
 // convert given cell to a Lisp-readable string
 std::string to_string(const cell & exp)
 {
-	if (exp.type == List)
+	if (exp.type == List || exp.type == Lambda)
 		return to_string(exp.list);
 	else if (exp.type == Lambda)
 		return "<Lambda>";
@@ -731,6 +746,17 @@ NUMTYPE internal_syscall3(NUMTYPE signal, NUMTYPE arg1, NUMTYPE arg2) {
 		case SYS3_ENV_HAS: return c_env_has((const char *)arg1, arg2);
 		case SYS3_PARSE: return c_parse((const char*)arg1, arg2);
 		case SYS3_LISP_MAIN: return lispmain(arg1, (char**)arg2);
+		case SYS3_CELL_SETTYPE: {
+			cell *c = CELL(arg2);
+			c->type = static_cast<cell_type>(arg1);
+			return OBJ_TO_C(c);
+		}
+		case SYS3_CELL_SETENV: {
+			env_p *env = ENV_P(arg1);
+			cell *c = CELL(arg2);
+			c->env = *env;
+			return OBJ_TO_C(c);
+		}
 	}
 	std::stringstream ss;
 	ss << "Invalid syscall #3: " << signal << ", args: " << arg1 << ", " << arg2;
@@ -739,7 +765,8 @@ NUMTYPE internal_syscall3(NUMTYPE signal, NUMTYPE arg1, NUMTYPE arg2) {
 NUMTYPE internal_syscall4(NUMTYPE signal, NUMTYPE arg1, NUMTYPE arg2, NUMTYPE arg3) {
 	switch(signal) {
 		case SYS4_CALL_PROC: return c_call_proc(arg1, arg2, arg3);
-		case SYS4_ENV_SET: return c_env_set((const char*)arg1, arg2, arg3);
+		case SYS4_ENV_SET: return c_env_set(arg1, arg2, arg3);
+		case SYS4_ENV_NEWARGS: return c_env_newargs(arg1, arg2, arg3);
 	}
 	std::stringstream ss;
 	ss << "Invalid syscall #4: " << signal << ", args: " << arg1 << ", " << arg2 << ", " << arg3;

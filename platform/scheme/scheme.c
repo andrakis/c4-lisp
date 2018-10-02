@@ -17,6 +17,8 @@ int debug;
 enum { Symbol, Number, List, Proc, Lambda };
 // };
 
+enum { STDIN, STDOUT, STDERR };
+
 // Special values
 enum { ENV_NOPARENT = 0 };
 
@@ -154,8 +156,9 @@ void *cell_tail(void *cell, void *dest) {
 }
 
 void *cell_set_lambda(void *env, void *cell) {
-	cell = (void*)syscall3(SYS3_CELL_SETTYPE, Lambda, (int)cell);
-	return (void*)syscall3(SYS3_CELL_SETENV, (int)env, (int)cell);
+	syscall3(SYS3_CELL_SETTYPE, Lambda, (int)cell);
+	syscall3(SYS3_CELL_SETENV, (int)env, (int)cell);
+	return cell;
 }
 
 int cell_type(void *cell) {
@@ -323,11 +326,15 @@ void *eval(void *x, void *env) {
 		}
 		if(cell_strcmp("define", first) == 0) {	// (define var exp)
 			result = eval(cell_index(2, x), env);
-			env = env_set(cell_index(1, x), result, env);
+			env_set(cell_index(1, x), result, env);
 			return result;
 		}
-		if(cell_strcmp("lambda", first) == 0)	// (lambda (var*) exp)
-			return cell_set_lambda(env, x);
+		if(cell_strcmp("lambda", first) == 0) {	// (lambda (var*) exp)
+			if(debug) dprintf(STDERR, "setting lambda on item with %ld elements\n", cell_size(x));
+			x = cell_set_lambda(env, x);
+			if(debug) dprintf(STDERR, "set lambda on item with %ld elements\n", cell_size(x));
+			return x;
+		}
 		if(cell_strcmp("begin", first) == 0) {	// (begin exp*)
 			// TODO: use iterator
 			size = cell_size(x);
@@ -345,8 +352,9 @@ void *eval(void *x, void *env) {
 	i = 1;
 	
 	if(debug) {
-		printf("  proc, args created at %x, proc cell is: %x\n", exps, proc);
+		printf("  proc/lambda, args created at %x, proc cell is: %x\n", exps, proc);
 		printf("  number args: %ld\n", size);
+		dprintf(STDERR, "  proc size: %ld\n", cell_size(proc));
 	}
 	
 	// Evaluate arguments
@@ -367,13 +375,20 @@ void *eval(void *x, void *env) {
 	}
 	type = cell_type(proc);
 	if(type == Lambda) {
-		if(debug) printf("  proc type Lambda\n");
+		if(debug) printf("  proc type Lambda: ");
+		if(debug) print_cell(proc);
+		if(debug) {
+			printf("\nproc args: "); print_cell(cell_index(1, proc));
+			printf("\nproc values: "); print_cells(exps); printf("\n");
+		}
 		// Create new environment parented to current
 		env = env_new_args(
 			cell_index(1, proc) /* arg names list */,
 			exps                /* values */,
 			env                 /* parent */);
+		if(debug) printf("  proc env created: %x\n", env);
 		// exps no longer needed
+		if(debug) printf("  free exps\n");
 		list_free(exps);
 		result = eval(cell_index(2, proc), env);
 		return result;
@@ -424,7 +439,14 @@ int main(int argc, char **argv)
 	// setup globals
 	debug = 0;
 	//code = "(print (quote Hello))";
-	code = "(print (quote Two plus 2 is) (+ 2 2))";
+	//code = "(print (quote Two plus 2 is) (+ 2 2))";
+	code =
+		"(begin "
+		"    (define y 5) "
+		"    (print y "
+		"        (quote doubled is) "
+		"        ((lambda (x) (+ x x)) y))"
+		")";
 	--argc; ++argv;
 	parse_args(argc, argv);
 

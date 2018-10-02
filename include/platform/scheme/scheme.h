@@ -43,7 +43,7 @@ struct cell {
 		list = c.list;
 		env = c.env;
 	}
-	bool is_list() const { return type == List; }
+	bool is_list() const { return type == List || type == Lambda; }
 	bool is_empty() const { return is_list() ? list.empty() : true; }
 	size_t list_size() const { return is_list() ? list.size() : 0; }
 	std::string str() const { return to_string(*this); }
@@ -56,9 +56,10 @@ struct cell {
 struct environment {
 	environment(env_p outer = 0) : outer_(outer) {}
 
-	environment(const cells & parms, const cells & args, env_p outer)
+	environment(const cell & _parms, const cells & args, env_p outer)
 		: outer_(outer)
 	{
+		const cells &parms = _parms.list;
 		cellit a = args.begin();
 		for (cellit p = parms.begin(); p != parms.end(); ++p)
 			env_[p->val] = *a++;
