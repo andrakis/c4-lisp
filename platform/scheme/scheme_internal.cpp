@@ -13,6 +13,15 @@
 
 using namespace bpstd; // KDevelop refuses to belief this namespace exists
 
+char *c_persistent_string(const std::string &s) {
+	char *result;
+	result = (char*)malloc(s.length() + 1);
+	if(!result)
+		return 0;
+	strcpy(result, s.c_str());
+	return result;
+}
+
 NUMTYPE unhandled_event(string_view reason);
 inline NUMTYPE unhandled_event(const std::stringstream &ss) {
 	return unhandled_event(ss.str());
@@ -205,6 +214,16 @@ NUMTYPE c_env_lookup(NUMTYPE _cell, NUMTYPE _env) {
 	return 0;
 }
 
+NUMTYPE c_env_cstr(NUMTYPE _env) {
+	env_p *env = ENV_P(_env);
+	std::stringstream ss;
+	char *result;
+
+	ss << to_string(*(env->get()));
+	result = c_persistent_string(ss.str());
+	return OBJ_TO_C(result);
+}
+
 // return (*env)[x.list[1].val] = eval(x.list[2], env);
 NUMTYPE c_env_set(NUMTYPE _name, NUMTYPE _value, NUMTYPE _env) {
 	cell *name = CELL(_name);
@@ -364,17 +383,8 @@ NUMTYPE c_cell_list(NUMTYPE _cell) {
 	return (NUMTYPE)&c->list;
 }
 
-char *c_persistent_string(const std::string s) {
-	char *result;
-	result = (char*)malloc(s.length() + 1);
-	if(!result)
-		return 0;
-	strcpy(result, s.c_str());
-	return result;
-}
-
 // c_cell_str(cell&) -> char*;
-// Caller is responsible for freeing the resulting string via free(3)
+// Caller is responsible for freeing the resulting string via SYS2_CSTR_FREE
 NUMTYPE c_cell_cstr(const cell &c) {
 	std::stringstream ss;
 	char *result;
@@ -579,12 +589,14 @@ NUMTYPE c_parse(const char *str, NUMTYPE _dest) NOEXCEPT {
 	}
 }
 
+std::string to_string(const cell &exp);
 std::string to_string(const cells &exp);
+std::string to_string(const environment &exp);
 
 // convert given cell to a Lisp-readable string
 std::string to_string(const cell & exp)
 {
-	if (exp.type == List || exp.type == Lambda)
+	if (exp.type == List)
 		return to_string(exp.list);
 	else if (exp.type == Lambda)
 		return "<Lambda>";
@@ -597,9 +609,13 @@ std::string to_string(const cells &exp) {
 	std::string s("(");
 	for(auto i = exp.cbegin(); i < exp.cend(); ++i)
 		s += to_string(*i) + ' ';
-	if (s[s.size() - 1] == ' ')
+	if (!s.empty() && s[s.size() - 1] == ' ')
 		s.erase(s.size() - 1);
 	return s + ')';
+}
+
+std::string to_string(const environment &env) {
+	return env.str();
 }
 
 NUMTYPE c_cell_free(NUMTYPE _cell) {
@@ -719,6 +735,11 @@ NUMTYPE internal_syscall2(NUMTYPE signal, NUMTYPE arg1) {
 			e = ep->get();
 			add_globals(*e);
 			return OBJ_TO_C(ep);
+		case SYS2_ENV_CSTR:
+			return c_env_cstr(arg1);
+		case SYS2_CSTR_FREE:
+			delete reinterpret_cast<char*>(arg1);
+			return 0;
 	}
 	
 	std::stringstream ss;

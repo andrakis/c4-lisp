@@ -54,8 +54,10 @@ enum {
 	SYS2_LIST_NEW,  // (int List|0) -> int. List
 	SYS2_LIST_SIZE, // (int List) -> int.
 	SYS2_ENV,       // (int Outer) -> int.
+	SYS2_ENV_CSTR,  // (int Env) -> char.
 	SYS2_FREE_ENV,  // (int Env) -> void. Free an environment object
 	SYS2_ADD_GLOBS,  // (int Env) -> void. Add global symbols to given env
+	SYS2_CSTR_FREE, // (char *str) -> void. Free a C string
 	_SYS2_END        // Must be last element
 };
 // };

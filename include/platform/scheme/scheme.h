@@ -13,14 +13,15 @@
 
 // Forward declarations
 struct cell;
-std::string to_string(const cell &exp);
-
 struct environment; // forward declaration; cell and environment reference each other
 typedef std::shared_ptr<environment> env_p;
 
 typedef std::vector<cell> cells;
 typedef cells::const_iterator cellit;
+
+std::string to_string(const cell &exp);
 std::string to_string(const cells &exp);
+std::string to_string(const environment &exp);
 
 // a variant that can hold any kind of lisp value
 ////////////////////// cell
@@ -48,6 +49,16 @@ struct cell {
 	size_t list_size() const { return is_list() ? list.size() : 0; }
 	std::string str() const { return to_string(*this); }
 };
+
+inline bool endswith(const std::string &search, const std::string &str) {
+	if(str.length() < search.length()) return false;
+	auto it1 = str.cend() - search.length();
+	auto it2 = search.cbegin();
+	for ( ; it1 != str.cend() && it2 != search.cend(); ++it1, ++it2) {
+		if(*it1 != *it2) return false;
+	}
+	return true;
+}
 
 ////////////////////// environment
 
@@ -91,6 +102,20 @@ struct environment {
 	cell & operator[] (const std::string & var)
 	{
 		return env_[var];
+	}
+
+	std::string str() const {
+		std::string s("{");
+		for(auto it = env_.cbegin(); it != env_.cend(); ++it)
+			s += it->first + ": " + to_string(it->second) + ", ";
+		s += "PARENT: ";
+		if(outer_) {
+			s += outer_->str();
+		} else {
+			s += "none";
+		}
+		s += "}";
+		return s;
 	}
 
 private:
