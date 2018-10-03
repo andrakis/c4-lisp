@@ -225,6 +225,9 @@ void next()
 			while (*p != 0 && *p != tk) {
 				if ((ival = *p++) == '\\') {
 					if ((ival = *p++) == 'n') ival = '\n';
+					else if(ival == 't') ival = '\t';
+					else if(ival == 'r') ival = '\r';
+					else if(ival == '0') ival = '\0';
 				}
 				if (tk == '"') *data++ = ival;
 			}
