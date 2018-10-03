@@ -506,7 +506,7 @@ int parse(char *source) {
 			ty = bt;
 			while (tk == Mul) { next(); ty = ty + PTR; }
 			if (tk != Id) { dprintf(STDERR, "%d: bad global declaration\n", line); return 0; }
-			if (id[Class]) { dprintf(STDERR, "%d: duplicate global definition for %s\n", line, id[Class]); return 0; }
+			if (id[Class]) { dprintf(STDERR, "%d: duplicate global definition for %.*s\n", line, id[NameLen], id[Name]); return 0; }
 			next();
 			id[Type] = ty;
 			if (tk == '(') { // function
