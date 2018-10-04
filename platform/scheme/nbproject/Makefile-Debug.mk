@@ -67,17 +67,17 @@ LDLIBSOPTIONS=
 ${OBJECTDIR}/scheme.o: nbproject/Makefile-${CND_CONF}.mk scheme.c 
 	${MKDIR} -p ${OBJECTDIR}
 	${RM} "$@.d"
-	$(COMPILE.c) -g -DDEBUG -DGCC_RDYNAMIC -DCND_PLATFORM=\"${CND_PLATFORM}\" -I../../include -fPIC  -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/scheme.o scheme.c
+	$(COMPILE.c) -g -DCND_PLATFORM=\"${CND_PLATFORM}\" -DDEBUG -DGCC_RDYNAMIC -I../../include -fPIC  -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/scheme.o scheme.c
 
 ${OBJECTDIR}/scheme_internal.o: nbproject/Makefile-${CND_CONF}.mk scheme_internal.cpp 
 	${MKDIR} -p ${OBJECTDIR}
 	${RM} "$@.d"
-	$(COMPILE.cc) -g -s -DCPP14 -DDEBUG -DRDYNAMIC -DCND_PLATFORM=\"${CND_PLATFORM}\" -I../../include -std=c++14 -fPIC  -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/scheme_internal.o scheme_internal.cpp
+	$(COMPILE.cc) -g -s -DCND_PLATFORM=\"${CND_PLATFORM}\" -DCPP14 -DDEBUG -DRDYNAMIC -I../../include -std=c++14 -fPIC  -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/scheme_internal.o scheme_internal.cpp
 
 ${OBJECTDIR}/syscalls.o: nbproject/Makefile-${CND_CONF}.mk syscalls.c 
 	${MKDIR} -p ${OBJECTDIR}
 	${RM} "$@.d"
-	$(COMPILE.c) -g -DDEBUG -DGCC_RDYNAMIC -DCND_PLATFORM=\"${CND_PLATFORM}\" -I../../include -fPIC  -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/syscalls.o syscalls.c
+	$(COMPILE.c) -g -DCND_PLATFORM=\"${CND_PLATFORM}\" -DDEBUG -DGCC_RDYNAMIC -I../../include -fPIC  -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/syscalls.o syscalls.c
 
 # Subprojects
 .build-subprojects:

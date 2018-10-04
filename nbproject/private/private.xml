@@ -9,5 +9,8 @@
         <group>
             <file>file:/home/daedalus/NetBeansProjects/lisp4/core/c4.c</file>
         </group>
+        <group name="C4">
+            <file>file:/home/daedalus/NetBeansProjects/lisp4/core/main.cpp</file>
+        </group>
     </open-files>
 </project-private>
