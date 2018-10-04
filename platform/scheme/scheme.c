@@ -342,9 +342,7 @@ void *eval(void *x, void *env) {
 	}
 	if(type == Symbol) {
 		if(cell_strcmp("quote", first) == 0) {	// (quote exp)
-			result = cell_new();
-			cell_tail(x, result);
-			return result;
+			return cell_index(1, x);
 		}
 		if(cell_strcmp("if", first) == 0) {		// (if test conseq [alt])
 			test = cell_index(1, x);
@@ -546,14 +544,14 @@ int run_tests() {
 		"((combine f) (tail x) (tail y)))))))", "<Lambda>");
 	TEST("(define zip (combine cons))", "<Lambda>");
 	TEST("(zip (list 1 2 3 4) (list 5 6 7 8))", "((1 5) (2 6) (3 7) (4 8))");
-	/* TEST("(define riff-shuffle (lambda (deck) (begin"
+	TEST("(define riff-shuffle (lambda (deck) (begin"
 		"(define take (lambda (n seq) (if (<= n 0) (quote ()) (cons (head seq) (take (- n 1) (tail seq))))))"
 		"(define drop (lambda (n seq) (if (<= n 0) seq (drop (- n 1) (tail seq)))))"
 		"(define mid (lambda (seq) (/ (length seq) 2)))"
 		"((combine append) (take (mid deck) deck) (drop (mid deck) deck)))))", "<Lambda>");
 	TEST("(riff-shuffle (list 1 2 3 4 5 6 7 8))", "(1 5 2 6 3 7 4 8)");
 	TEST("((repeat riff-shuffle) (list 1 2 3 4 5 6 7 8))", "(1 3 5 7 2 4 6 8)");
-	TEST("(riff-shuffle (riff-shuffle (riff-shuffle (list 1 2 3 4 5 6 7 8))))", "(1 2 3 4 5 6 7 8)"); */
+	TEST("(riff-shuffle (riff-shuffle (riff-shuffle (list 1 2 3 4 5 6 7 8))))", "(1 2 3 4 5 6 7 8)");
 	dprintf(STDERR, "Tests %ssuccessful, successes=%ld failures=%ld\n",
 		(TEST_fail > 0 ? "un" : ""), TEST_success, TEST_fail);
 
@@ -635,7 +633,7 @@ int main(int argc, char **argv)
 		"(begin "
 		"    (define y 5) "
 		"    (print y "
-		"        (quote doubled is) "
+		"        (quote (doubled is)) "
 		"        ((lambda (x) (+ x x)) y))"
 		")";
 	--argc; ++argv;
