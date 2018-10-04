@@ -25,8 +25,8 @@ enum { ENV_NOPARENT = 0 };
 
 void showhelp(char *argv0) {
 	dprintf(STDERR, "lisp on c4\n");
-	dprintf(STDERR, "Invocation: %s [-d] [code]\n", argv0);
-	dprintf(STDERR, "	-d      Enable g_debug mode\n");
+	dprintf(STDERR, "Invocation: %s [-d] [-t | code]\n", argv0);
+	dprintf(STDERR, "	-d      Enable debug mode\n");
 	dprintf(STDERR, "	-t      Run tests\n");
 	dprintf(STDERR, "	code    Code to run\n");
 	dprintf(STDERR, "\nIf no [code] is given, the following code is run:\n%s\n", g_code);
