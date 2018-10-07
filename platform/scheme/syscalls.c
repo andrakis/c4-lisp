@@ -26,3 +26,7 @@ NUMTYPE syscall3(NUMTYPE signal, NUMTYPE arg1, NUMTYPE arg2) {
 NUMTYPE syscall4(NUMTYPE signal, NUMTYPE arg1, NUMTYPE arg2, NUMTYPE arg3) {
 	return internal_syscall4(signal, arg1, arg2, arg3);
 }
+
+NUMTYPE syscall_main(NUMTYPE argc, char **argv) {
+	return syscall3(SYS3_LISP_MAIN, argc, (NUMTYPE)argv);
+}

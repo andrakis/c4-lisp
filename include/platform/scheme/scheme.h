@@ -184,6 +184,7 @@ enum {
 // syscalls that take 1 argument (the signal, 1 arg)
 enum {
 	SYS2_ISDIG,  // (char Digit) -> 1 | 0. check if is digit
+	SYS2_CELL_NEW_STR, // (char *str) -> int. Cell
 	SYS2_CELL_COPY, // (int Cell) -> int. copy a cell from a pointer
 	SYS2_CELL_EMPTY,// (int Cell) -> 1 | 0. check if empty
 	SYS2_CELL_ENV_GET, // (int Cell) -> int. get pointer to cell's env
@@ -215,6 +216,7 @@ enum {
 	SYS3_CELL_ENV_SET,// (int Env, int Cell) -> void.
 	SYS3_CELL_INDEX,  // (int Index, int Cell) -> int. Cell
 	SYS3_CELL_NEW,    // (int Tag, char *Value) -> int. Cell
+	SYS3_CELL_NEW_STRN,//(char *str, int n) -> int. Cell
 	SYS3_CELL_RESET,  // (int Source, int Dest) -> void. Reset cell value to Source values
 	SYS3_CELL_SETENV, // (int Env, int Cell) -> int. Cell
 	SYS3_CELL_SETTYPE,// (int Type, int Cell) -> int. Cell

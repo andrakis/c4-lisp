@@ -47,6 +47,7 @@ enum {
 // syscalls that take 1 argument (the signal, 1 arg)
 enum {
 	SYS2_ISDIG,  // (char Digit) -> 1 | 0. check if is digit
+	SYS2_CELL_NEW_STR, // (char *str) -> int. Cell
 	SYS2_CELL_COPY, // (int Cell) -> int. copy a cell from a pointer
 	SYS2_CELL_EMPTY,// (int Cell) -> 1 | 0. check if empty
 	SYS2_CELL_ENV_GET, // (int Cell) -> int. get pointer to cell's env
@@ -78,6 +79,7 @@ enum {
 	SYS3_CELL_ENV_SET,// (int Env, int Cell) -> void.
 	SYS3_CELL_INDEX,  // (int Index, int Cell) -> int. Cell
 	SYS3_CELL_NEW,    // (int Tag, char *Value) -> int.
+	SYS3_CELL_NEW_STRN,//(char *str, int n) -> int. Cell
 	SYS3_CELL_RESET,  // (int Source, int Dest) -> void. Reset cell value to Source values
 	SYS3_CELL_SETENV, // (int Env, int Cell) -> int. Cell
 	SYS3_CELL_SETTYPE,// (int Type, int Cell) -> int. Cell
@@ -114,8 +116,10 @@ char *s_quote,
      *s_false,
      *s_true;
 
+// References to atoms
 void *sym_nil, *sym_true, *sym_false;
 
+// Library interface
 void *getsym_nil() { return (void*)syscall1(SYS1_ATOM_NIL); }
 void *getsym_true() { return (void*)syscall1(SYS1_ATOM_TRUE); }
 void *getsym_false() { return (void*)syscall1(SYS1_ATOM_FALSE); }
@@ -124,7 +128,18 @@ void *cell_new() {
 	return (void*)syscall1(SYS1_CELL_NEW);
 }
 
-// Wrappers around various syscalls
+void *cell_new2(int type, char *value) {
+	return (void*)syscall3(SYS3_CELL_NEW, type, (int) value);
+}
+
+void *cell_new_str(char *str) {
+	return (void*)syscall2(SYS2_CELL_NEW_STR, (int)str);
+}
+
+void *cell_new_strn(char *str, int n) {
+	return (void*)syscall3(SYS3_CELL_NEW_STRN, (int)str, n);
+}
+
 int cell_empty(void *cell) {
 	return syscall2(SYS2_CELL_EMPTY, (int)cell);
 }
@@ -250,6 +265,7 @@ int lisp_parse(char *code, void *dest) {
 	return syscall3(SYS3_PARSE, (int)code, (int)dest);
 }
 
+// Utility functions
 void print_cell2(void *cell, int fd) {
 	char *str;
 
@@ -290,164 +306,226 @@ void print_env(void *env) {
 	print_env2(env, STDERR);
 }
 
+// Parsing
+void *l4_tokenize(char *s) {
+	void *tokens, *tmp;
+	char *t;
+	
+	tokens = list_new();
+	while(*s) {
+		// Skip whitespace
+		while(*s == ' ') ++s;
+		// Start or end of list
+		if(*s == '(' || *s == ')') {
+			tmp = cell_new_str(*s++ == '(' ? "(" : ")");
+			list_push_back(tmp, tokens);
+			cell_free(tmp);
+		} else {
+			t = s;
+			while(*t && *t != ' ' && *t != '(' && *t != ')') ++t;
+			tmp = cell_new_strn(s, t - s);
+			list_push_back(tmp, tokens);
+			s = t;
+			cell_free(tmp);
+		}
+	}
+
+	return tokens;
+}
+
+int isdig(char d) {
+	return d >= '0' && d <= '9';
+}
+
+void *l4_atom(char *token) {
+	if(isdig(*token) || (*token == '-' && isdig(token[1])))
+		return cell_new2(Number, token);
+	return cell_new2(Symbol, token);
+}
+
+/*void *l4_read_from(char *tokens) {
+	char *token;
+
+	if(tokens == 0 || *tokens == 0) {
+		dprintf(STDERR, "read_from: unexpected end of tokens\n");
+		exit(2);
+	}
+}*/
+
+// Eval implementation
 void *eval(void *x, void *env) {
-	int type, size, i;
+	int type, size, i, flag_handled;
 	void *result, *first, *test, *conseq, *alt;
 	void *env2;
 	void *proc, *exps;
 	void *t1, *t2;
 	
-	if(g_debug) dprintf(STDERR, "eval(%x, %x)\n", x, env);
+	while(1) {
+		flag_handled = 0;
+		if(g_debug) {
+			dprintf(STDERR, "eval(");
+			print_cell(x);
+			dprintf(STDERR, ", 0x%x)\n", env);
+		}
 
-	result = 0;
-	type = cell_type(x);
-	if(type == Symbol) {
-		if(g_debug) {
-			dprintf(STDERR, "  env.lookup(");
-			print_cell(x);
-			dprintf(STDERR, ") => ");
-		}
-		result = env_lookup(x, env);
-		if(g_debug) {
-			print_cell(result);
-			dprintf(STDERR, "\n");
-		}
-		if(!result) {
-			dprintf(STDERR, "Unknown symbol: ");
-			print_cell(x);
-			dprintf(STDERR, "\nSymbol table:\n");
-			print_env(env);
-			dprintf(STDERR, "\n");
-			exit(1);
-		}
-		return result;
-	}
-	if(type == Number) {
-		if(g_debug) {
-			print_cell(x);
-			dprintf(STDERR, "\n");
-		}
-		return x;
-	}
-	if(cell_empty(x)) {
-		return sym_nil;
-	}
-
-	first = cell_front(x);
-	type = cell_type(first);
-	if(g_debug) {
-		dprintf(STDERR, "  fn_call := ");
-		print_cell(first);
-		dprintf(STDERR, " (...)\n");
-	}
-	if(type == Symbol) {
-		if(cell_strcmp("quote", first) == 0) {	// (quote exp)
-			return cell_index(1, x);
-		}
-		if(cell_strcmp("if", first) == 0) {		// (if test conseq [alt])
-			test = cell_index(1, x);
-			conseq = cell_index(2, x);
-			alt = cell_index_default(3, sym_nil, x);
+		result = 0;
+		type = cell_type(x);
+		if(type == Symbol) {
 			if(g_debug) {
-				dprintf(STDERR, "  !if [%x\t\t%x\t\t%x]\n", test, conseq, alt);
-				dprintf(STDERR, "      [");
-				print_cell(test); dprintf(STDERR, "\t\t");
-				print_cell(conseq); dprintf(STDERR, "\t\t");
-				print_cell(alt); dprintf(STDERR, "]\n");
+				dprintf(STDERR, "  env.lookup(");
+				print_cell(x);
+				dprintf(STDERR, ") => ");
 			}
-			result = eval(test, env);
+			result = env_lookup(x, env);
 			if(g_debug) {
-				dprintf(STDERR, "  !ifresult: %x\n", result);
-				dprintf(STDERR, "           : ");
-				print_cell(result); dprintf(STDERR, "\n");
-				dprintf(STDERR, "  !  cell_strcmp(%x, %x)\n", s_false, result);
+				print_cell(result);
+				dprintf(STDERR, "\n");
 			}
-			result = (cell_strcmp(s_false, result) == 0) ? alt : conseq;
-			result = eval(result, env);
+			if(!result) {
+				dprintf(STDERR, "Unknown symbol: ");
+				print_cell(x);
+				dprintf(STDERR, "\nSymbol table:\n");
+				print_env(env);
+				dprintf(STDERR, "\n");
+				exit(1);
+			}
 			return result;
 		}
-		if(cell_strcmp("set!", first) == 0) {	// (set! var exp)
-			result = eval(cell_index(2, x), env);
-			env_set(cell_index(1, x), result, env);
-			return result;
-		}
-		if(cell_strcmp("define", first) == 0) {	// (define var exp)
-			result = eval(cell_index(2, x), env);
-			env_set(cell_index(1, x), result, env);
-			return result;
-		}
-		if(cell_strcmp("lambda", first) == 0) {	// (lambda (var*) exp)
-			x = cell_set_lambda(env, x);
-			if(g_debug) dprintf(STDERR, "set lambda on item, env=%x\n", env);
+		if(type == Number) {
+			/*if(g_debug) {
+				print_cell(x);
+				dprintf(STDERR, "\n");
+			}*/
 			return x;
 		}
-		if(cell_strcmp("begin", first) == 0) {	// (begin exp*)
-			// TODO: use iterator
+		if(cell_empty(x)) {
+			return sym_nil;
+		}
+
+		first = cell_front(x);
+		type = cell_type(first);
+		if(g_debug) {
+			dprintf(STDERR, "  fn_call := ");
+			print_cell(x);
+			dprintf(STDERR, " \n");
+		}
+		if(type == Symbol) {
+			if(cell_strcmp("quote", first) == 0) {	// (quote exp)
+				return cell_index(1, x);
+			}
+			if(cell_strcmp("if", first) == 0) {		// (if test conseq [alt])
+				test = cell_index(1, x);
+				conseq = cell_index(2, x);
+				alt = cell_index_default(3, sym_nil, x);
+				/*if(g_debug) {
+					dprintf(STDERR, "  !if [%x\t\t%x\t\t%x]\n", test, conseq, alt);
+					dprintf(STDERR, "      [");
+					print_cell(test); dprintf(STDERR, "\t\t");
+					print_cell(conseq); dprintf(STDERR, "\t\t");
+					print_cell(alt); dprintf(STDERR, "]\n");
+				}*/
+				result = eval(test, env);
+				if(g_debug) {
+					dprintf(STDERR, "  ===> "); print_cell(result); dprintf(STDERR, "\n");
+				}
+				result = (cell_strcmp(s_false, result) == 0) ? alt : conseq;
+				// recurse
+				x = result;
+				flag_handled = 1;
+				
+				/*result = eval(result, env);
+				if(g_debug) {
+					dprintf(STDERR, "    => "); print_cell(result); dprintf(STDERR, "\n");
+				}
+				return result;*/
+			}
+			if(cell_strcmp("set!", first) == 0) {	// (set! var exp)
+				result = eval(cell_index(2, x), env);
+				env_set(cell_index(1, x), result, env);
+				return result;
+			}
+			if(cell_strcmp("define", first) == 0) {	// (define var exp)
+				result = eval(cell_index(2, x), env);
+				env_set(cell_index(1, x), result, env);
+				return result;
+			}
+			if(cell_strcmp("lambda", first) == 0) {	// (lambda (var*) exp)
+				x = cell_set_lambda(env, x);
+				//if(g_debug) dprintf(STDERR, "set lambda on item, env=%x\n", env);
+				return x;
+			}
+			if(cell_strcmp("begin", first) == 0) {	// (begin exp*)
+				// TODO: use iterator
+				size = cell_size(x);
+				i = 1;
+				while(i < size - 1)
+					eval(cell_index(i++, x), env);
+				//return eval(cell_index(i, x), env);
+				// recurse
+				x = cell_index(i, x);
+				flag_handled = 1;
+			}
+		}
+
+		// (proc exp*)
+		if(!flag_handled) {
+			exps = list_new();
+			proc = eval(first, env);
 			size = cell_size(x);
 			i = 1;
-			while(i < size - 1)
-				eval(cell_index(i++, x), env);
-			return eval(cell_index(i, x), env);
+			
+			// Evaluate arguments
+			while(i < size) {
+				t1 = cell_index(i++, x);
+				/*if(g_debug) {
+					dprintf(STDERR, "    arg at %ld: ", i - 1);
+					print_cell(t1);
+					dprintf(STDERR, "\n");
+				}*/
+				t2 = eval(t1, env);
+				/*if(g_debug) {
+					dprintf(STDERR, " => ");
+					print_cell(t2);
+					dprintf(STDERR, "\n");
+				}*/
+				list_push_back(t2, exps);
+			}
+			type = cell_type(proc);
+			if(type == Lambda) {
+				/*if(g_debug) dprintf(STDERR, "  proc type Lambda: ");
+				if(g_debug) print_cell(proc);
+				if(g_debug) {
+					dprintf(STDERR, "\nproc args: "); print_cell(cell_index(1, proc));
+					dprintf(STDERR, "\nproc values: "); print_cells(exps); dprintf(STDERR, "\n");
+					dprintf(STDERR, "  proc env: %x\n", cell_env_get(proc));
+				}*/
+				// Create new environment parented to current
+				env2 = env_new_args(
+					cell_index(1, proc) /* arg names list */,
+					exps                /* values */,
+					cell_env_get(proc)  /* parent */);
+				// exps no longer needed
+				//if(g_debug) dprintf(STDERR, "  free exps\n");
+				list_free(exps);
+				// recurse
+				x = cell_index(2, proc);
+				env = env2;
+			} else if(type == Proc) {
+				if(g_debug) dprintf(STDERR, "  proc type Proc() => ");
+				result = cell_new();
+				proc_invoke(exps, proc, result);
+				list_free(exps);
+				if(g_debug) {
+					print_cell(result);
+					dprintf(STDERR, "\n");
+				}
+				return result;
+			} else {
+				dprintf(STDERR, "Invalid call in eval\n");
+				exit(1);
+			}
 		}
 	}
-
-	// (proc exp*)
-	exps = list_new();
-	proc = eval(first, env);
-	size = cell_size(x);
-	i = 1;
-	
-	if(g_debug) {
-		dprintf(STDERR, "  proc/lambda, args created at %x, proc cell is: %x\n", exps, proc);
-		dprintf(STDERR, "  number args: %ld\n", size);
-		dprintf(STDERR, "  proc size: %ld\n", cell_size(proc));
-	}
-	
-	// Evaluate arguments
-	while(i < size) {
-		t1 = cell_index(i++, x);
-		if(g_debug) {
-			dprintf(STDERR, "    arg at %ld: ", i - 1);
-			print_cell(t1);
-			dprintf(STDERR, "\n");
-		}
-		t2 = eval(t1, env);
-		if(g_debug) {
-			dprintf(STDERR, " => ");
-			print_cell(t2);
-			dprintf(STDERR, "\n");
-		}
-		list_push_back(t2, exps);
-	}
-	type = cell_type(proc);
-	if(type == Lambda) {
-		if(g_debug) dprintf(STDERR, "  proc type Lambda: ");
-		if(g_debug) print_cell(proc);
-		if(g_debug) {
-			dprintf(STDERR, "\nproc args: "); print_cell(cell_index(1, proc));
-			dprintf(STDERR, "\nproc values: "); print_cells(exps); dprintf(STDERR, "\n");
-			dprintf(STDERR, "  proc env: %x\n", cell_env_get(proc));
-		}
-		// Create new environment parented to current
-		env2 = env_new_args(
-			cell_index(1, proc) /* arg names list */,
-			exps                /* values */,
-			cell_env_get(proc)  /* parent */);
-		// exps no longer needed
-		if(g_debug) dprintf(STDERR, "  free exps\n");
-		list_free(exps);
-		result = eval(cell_index(2, proc), env2);
-		return result;
-	} else if(type == Proc) {
-		if(g_debug) dprintf(STDERR, "  proc type Proc\n");
-		result = cell_new();
-		proc_invoke(exps, proc, result);
-		list_free(exps);
-		return result;
-	}
-
-	dprintf(STDERR, "Invalid call in eval\n");
-	exit(1);
 }
 
 #define main lispmain
@@ -612,8 +690,6 @@ void parse_args(int argc, char **argv) {
 		} else {
 			// Code to run
 			g_code = *argv;
-			// clear argc
-			argc = 1;
 		}
 		--argc; ++argv;
 	}
@@ -676,7 +752,7 @@ int main(int argc, char **argv)
 	global = env_new(ENV_NOPARENT);
 	add_globals(global);
 	if(g_debug) {
-		dprintf(STDERR, " env.global: %x\n", global);
+		dprintf(STDERR, " env.global: 0x%x\n", global);
 
 		dprintf(STDERR, "Has +: %d\n", env_has("+", global));
 		dprintf(STDERR, "Has foo: %d\n", env_has("foo", global));
@@ -689,7 +765,7 @@ int main(int argc, char **argv)
 	}
 	if(g_debug) {
 		tmp = cell_cstr(tokens);
-		dprintf(STDERR, " tokens: %x (%s)\n", tokens, tmp);
+		dprintf(STDERR, " tokens: 0x%x (%s)\n", tokens, tmp);
 		cstr_free(tmp);
 	}
 

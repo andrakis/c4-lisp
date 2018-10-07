@@ -1,3 +1,4 @@
+#include <ctype.h>
 #include <iostream>
 #include <list>
 #include <sstream>
@@ -18,7 +19,7 @@ char *c_persistent_string(const std::string &s) {
 	result = (char*)malloc(s.length() + 1);
 	if(!result)
 		return 0;
-	strcpy(result, s.c_str());
+	strncpy(result, s.c_str(), s.length() + 1);
 	return result;
 }
 
@@ -97,8 +98,12 @@ NUMTYPE number_to_c(NUMTYPE v) {
 #define ENV_P(value)            (OBJ_FROM_C(env_p*, value))
 
 NUMTYPE c_cell_new(NUMTYPE tag, const char *value) {
-	//return (NUMTYPE)new cell((cell_type)tag, std::string(value));
 	cell *c = new cell((cell_type)tag, std::string(value));
+	return OBJ_TO_C(c);
+}
+
+NUMTYPE c_cell_new_strn(const char *value, NUMTYPE n) {
+	cell *c = new cell(Symbol, std::string(value, n));
 	return OBJ_TO_C(c);
 }
 
@@ -462,7 +467,7 @@ NUMTYPE c_list_push_back(NUMTYPE _cell, NUMTYPE _list) {
 	return 0;
 }
 
-////////////////////// eval
+////////////////////// eval - reference implementation
 
 cell eval(cell x, environment * env)
 {
@@ -529,13 +534,13 @@ std::list<std::string> tokenize(const std::string & str)
 	std::list<std::string> tokens;
 	const char * s = str.c_str();
 	while (*s) {
-		while (*s == ' ')
+		while (isspace(*s))
 			++s;
 		if (*s == '(' || *s == ')')
 			tokens.push_back(*s++ == '(' ? "(" : ")");
 		else {
 			const char * t = s;
-			while (*t && *t != ' ' && *t != '(' && *t != ')')
+			while (*t && !isspace(*t) && *t != '(' && *t != ')')
 				++t;
 			tokens.push_back(std::string(s, t));
 			s = t;
@@ -650,6 +655,8 @@ NUMTYPE internal_syscall2(NUMTYPE signal, NUMTYPE arg1) {
 	switch(signal) {
         case SYS2_ISDIG:
             return isdig((char)arg1) ? 1 : 0;
+		case SYS2_CELL_NEW_STR:
+			return OBJ_TO_C(new cell(Symbol, (char*)arg1));
 		case SYS2_CELL_COPY:
         case SYS2_CELL_EMPTY:
 		case SYS2_CELL_FRONT:
@@ -749,6 +756,7 @@ NUMTYPE internal_syscall2(NUMTYPE signal, NUMTYPE arg1) {
 NUMTYPE internal_syscall3(NUMTYPE signal, NUMTYPE arg1, NUMTYPE arg2) {
 	switch(signal) {
 		case SYS3_CELL_NEW: return c_cell_new(arg1, (const char*)arg2);
+		case SYS3_CELL_NEW_STRN: return c_cell_new_strn((const char*)arg1, arg2);
 		case SYS3_CELL_STRCMP: return c_cell_strcmp((const char*)arg1, arg2);
 		case SYS3_CELL_ENV_SET: return c_cell_env_set(arg1, arg2);
 		case SYS3_CELL_INDEX: {
