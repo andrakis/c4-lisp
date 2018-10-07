@@ -10,7 +10,13 @@
             <file>file:/home/daedalus/NetBeansProjects/lisp4/core/c4.c</file>
         </group>
         <group name="C4">
+            <file>file:/home/daedalus/NetBeansProjects/lisp4/include/core/syscalls.h</file>
+            <file>file:/home/daedalus/NetBeansProjects/lisp4/include/core/extras.h</file>
+            <file>file:/home/daedalus/NetBeansProjects/lisp4/core/c4.c</file>
+            <file>file:/home/daedalus/NetBeansProjects/lisp4/core/extras.c</file>
             <file>file:/home/daedalus/NetBeansProjects/lisp4/core/main.cpp</file>
+            <file>file:/home/daedalus/NetBeansProjects/lisp4/core/syscalls.cpp</file>
+            <file>file:/home/daedalus/NetBeansProjects/lisp4/include/core/solar.hpp</file>
         </group>
     </open-files>
 </project-private>
