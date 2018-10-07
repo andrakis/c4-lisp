@@ -36,7 +36,8 @@ int *e, *le,  // current position in emitted code
     line,     // current line number
     src,      // print source and assembly flag
     debug,    // print executed instructions
-    verbose;  // print more detailed info
+    verbose,  // print more detailed info
+	poolsz;   // pool size
 // VM symbols
 int *vm_processes, *vm_active_process, vm_proc_max, vm_proc_count, vm_cycle_count;
 
@@ -55,11 +56,11 @@ enum {
 	// C functions
 	OPEN,READ,CLOS,PRTF,DPRT,MALC,FREE,MSET,MCMP,EXIT,FDSZ,
 	// Platform related functions
-	PINI,RPTH,
+	PINI,RPTH,PLGT,
 	// VM related functions
 	PCHG /* Process changed */,
 	// Extended system calls (handled externally)
-	SYS1,SYS2,SYS3,SYS4,SYSI,
+	SYS1,SYS2,SYS3,SYS4,SYSI,SYSM,
 	// Pointer to last element
 	_SYMS
 };
@@ -72,9 +73,9 @@ void setup_opcodes() {
 		"SC  ,PSH ,OR  ,XOR ,AND ,EQ  ,NE  ,LT  ,GT  ,LE  ,GE  ,SHL ,"
 		"SHR ,ADD ,SUB ,MUL ,DIV ,MOD ,"
 		"OPEN,READ,CLOS,PRTF,DPRT,MALC,FREE,MSET,MCMP,EXIT,FDSZ,"
-		"PINI,RPTH,"
+		"PINI,RPTH,PLGT,"
 		"PCHG,"
-		"SYS1,SYS2,SYS3,SYS4,SYSI";
+		"SYS1,SYS2,SYS3,SYS4,SYSI,SYSM";
 }
 
 // Sets up the static data containing keywords and imported functions.
@@ -86,10 +87,10 @@ void setup_symbols() {
 		// C functions
 		"open read close printf dprintf malloc free memset memcmp exit fdsize "
 		// Dynamci runtime platform functions
-		"platform_init runtime_path "
+		"platform_init runtime_path platform_get "
 		"process_changed "
 		// Syscalls
-		"syscall1 syscall2 syscall3 syscall4 syscall_init "
+		"syscall1 syscall2 syscall3 syscall4 syscall_init syscall_main "
 		// void data type
 		"void "
 		// main
@@ -149,6 +150,29 @@ int *lookup_symbol(char *name, int *symbols) {
 	return 0;
 }
 
+enum { RAD_OCTAL = 8, RAD_DECIMAL = 10, RAD_HEX = 16 };
+int my_atoi(char *s) {
+	int i;
+	int radix;
+
+	radix = RAD_DECIMAL;
+
+	if(*s == '0') {
+		++s;
+		if(*s && *s == 'x') {
+			radix = RAD_HEX;
+			++s;
+		} else if(*s) {
+			radix = RAD_OCTAL;
+			++s;
+		}
+	}
+
+	i = 0;
+	while(*s != 0) { i = i * radix + (*s++ - '0'); }
+	return i;
+}
+
 // Compiler: read next symbol and assemble
 void next()
 {
@@ -188,11 +212,15 @@ void next()
 			return;
 		}
 		else if (tk >= '0' && tk <= '9') {
-			if (ival = tk - '0') { while (*p >= '0' && *p <= '9') ival = ival * 10 + *p++ - '0'; }
+			// Decimal
+			if (ival = tk - '0')
+				while (*p >= '0' && *p <= '9') ival = ival * 10 + *p++ - '0';
+			// Hexadecimal
 			else if (*p == 'x' || *p == 'X') {
 				while ((tk = *++p) && ((tk >= '0' && tk <= '9') || (tk >= 'a' && tk <= 'f') || (tk >= 'A' && tk <= 'F')))
 					ival = ival * 16 + (tk & 15) + (tk >= 'A' ? 9 : 0);
 			}
+			// Octal
 			else { while (*p >= '0' && *p <= '7') ival = ival * 8 + *p++ - '0'; }
 			tk = Num;
 			return;
@@ -680,9 +708,11 @@ int run_cycle(int *process, int cycles) {
 		else if (i == SYS3) { a = (int)syscall3(sp[2], sp[1], *sp); }
 		else if (i == SYS4) { a = (int)syscall4(sp[3], sp[2], sp[1], *sp); }
 		else if (i == SYSI) { a = (int)syscall_init(sp[1], *sp); }
+		else if (i == SYSM) { a = (int)syscall_main(sp[1], (char**)*sp); }
 		else if (i == FDSZ) { a = fdsize(*sp); }
 		else if (i == PINI) { a = platform_init((char*)*sp); }
 		else if (i == RPTH) { a = (int)runtime_path((char*)*sp); }
+		else if (i == PLGT) { a = (int)platform_get(); }
 		else if (i == PCHG) { process_changed((int*)*sp); }
 		else {
 			b = invalid_opcode_handler(i, process);
@@ -705,6 +735,7 @@ int run_cycle(int *process, int cycles) {
 	process[B_bp] = (int)bp;
 	process[B_a] = a;
 	process[B_cycle] = cycle;
+	process[B_platform] = (int)platform_get();
 	vm_active_process = 0;
 
 	return process[B_halted];
@@ -713,8 +744,7 @@ int run_cycle(int *process, int cycles) {
 int *create_process(char *source, int argc, char **argv) {
 	int *bp, *sp, *pc;
 	int *t;
-	int *process, *idmain, poolsz;
-	poolsz = 256*1024; // arbitrary size
+	int *process, *idmain;
 
 	if (!(process = (int*)malloc(__B * sizeof(int*)))) { dprintf(STDERR, "Could not malloc(%d) process space\n", __B); return 0; }
 
@@ -734,7 +764,7 @@ int *create_process(char *source, int argc, char **argv) {
 	memset(data, 0, poolsz);
 
 	if(!parse(source)) {
-		dprintf(STDERR, "Failed to pase source\n");
+		dprintf(STDERR, "Failed to parse source\n");
 		return 0;
 	}
 
@@ -810,24 +840,15 @@ void free_process(int *process) {
 	free((void*)process);
 }
 
-#if 0
-// Dummy value for when c5.c is run indirectly
-enum { SYS3_LISP_MAIN };
-#endif
-
 int c5_lispmain(int argc, char **argv) {
 	int result;
-#if 0
-	dprintf(STDERR, "Indirect call to c5_lispmain not supported\n");
-	return 1;
-#endif
-	// Runtime not loaded, load it
+	// Requires libscheme
 	if(platform_init(runtime_path("scheme"))) {
 		return 1;
 	}
 	if(debug)
-		dprintf(STDERR, "calling syscall3(SYS3_LISP_MAP, %ld, %x)\n", argc, (void*)argv);
-	result = syscall3(SYS3_LISP_MAIN, argc, (int)argv);
+		dprintf(STDERR, "calling syscall_main(%ld, %x)\n", argc, (void*)argv);
+	result = syscall_main(argc, argv);
 	platform_init(0);
 	return result;
 }
@@ -837,11 +858,11 @@ int c5_lispmain(int argc, char **argv) {
 int main(int argc, char **argv)
 {
 	int fd;
-	char *pp, *tmp, **tmp2;
+	char *pp, *tmp, **tmp2, ch, *argv0;
 	int *process;
 	int early_param_exit, i, ii, srcsize, exitcode;
 
-	vm_cycle_count = 1000;
+	argv0 = *argv;
 
 	// Set globals
 	setup_opcodes();
@@ -849,6 +870,8 @@ int main(int argc, char **argv)
 	data = 0;
 	B_MAGIC = 0xBEEF;
 	verbose = 0;
+	vm_cycle_count = 1000;
+	poolsz = 256*1024; // arbitrary size
 
 	// Allocate vm_processes
 	vm_proc_max = 32;
@@ -860,29 +883,44 @@ int main(int argc, char **argv)
 	--argc; ++argv;
 	early_param_exit = 0; // when to exit parameter parsing
 	while(argc > 0 && **argv == '-' && early_param_exit == 0) {
+		ch = (*argv)[1];
 		// -s      show source and exit
 		if ((*argv)[1] == 's') { src = 1; }
 		// -d      show source during execution
-		else if ((*argv)[1] == 'd') { debug = 1; }
+		else if (ch == 'd') { debug = 1; }
 		// -c 123  set cycle count to 123
-		else if ((*argv)[1] == 'c') {
+		else if (ch == 'c') {
 			--argc; ++argv;
-			// inline atoi
-			vm_cycle_count = 0;
-			pp = *argv;
-			while(*pp != 0) {
-				vm_cycle_count = vm_cycle_count * 10 + (*pp++ - '0');
+			vm_cycle_count = my_atoi(*argv);
+			if(debug || verbose)
+				dprintf(STDERR, "Cycle count set to %ld\n", vm_cycle_count);
+		}
+		// -p 123  set poolsz to 123
+		else if(ch == 'p') {
+			--argc; ++argv;
+			i = 0;
+			tmp = *argv;
+			if(*tmp == '+') {
+				i = poolsz; // adding to poolsz
+				++tmp;
 			}
-			dprintf(STDERR, "Cycle count set to %early_param_exit\n", vm_cycle_count);
+			i = i + my_atoi(tmp);
+			if(i < poolsz) {
+				dprintf(STDERR, "WARN: Requested pool size %ld smaller than default of %ld, skipped\n", i, poolsz);
+			} else {
+				poolsz = i;
+				if(debug || verbose)
+					dprintf(STDERR, "Pool size set to 0x%x bytes\n", poolsz);
+			}
 		}
 		// -r xyz  start additional process
-		else if((*argv)[1] == 'r') {
+		else if(ch == 'r') {
 			--argc; ++argv;
 			vm_processes[vm_proc_count++] = (int)*argv;
 			--argc; ++argv;
 		}
 		// -L      enter lispmain
-		else if((*argv)[1] == 'L') {
+		else if(ch == 'L') {
 #if 0  // Run under c4 only
 			// start lisp4.c instead, and end parameter passing
 			vm_processes[vm_proc_count++] = (int)"lisp4.c";
@@ -898,17 +936,42 @@ int main(int argc, char **argv)
 #endif
 		}
 		// -v      enable verbose mode
-		else if((*argv)[1] == 'v') { verbose = 1; }
+		else if(ch == 'v') { verbose = 1; }
 		// --      end parameter passing
-		else if((*argv)[1] == '-') { early_param_exit = 1; }
-		else {
-			dprintf(STDERR, "Invalid argument: %s\n", *argv);
+		else if(ch == '-') { early_param_exit = 1; }
+		// --      show help
+		else if(ch == 'h') {
+			printf("C4: The self-hosting C interpreter, originally by Robert Swierczek\n");
+			printf("  : with additions by Julian Thatcher\n");
+			printf("usage: %s [-L] [-s] [-d] [-v] [-c nn] [-r file] [-p [+]nn] file args...\n", argv0);
+            printf("    -L            Load default platform library, and enter main\n");
+            printf("    -s            Print source and exit\n");
+            printf("    -d            Enable debugging mode\n");
+            printf("    -v            Enable verbose mode\n");
+            printf("    -c nn         Set process cycle count to nnn\n");
+            printf("    -r file       Start additional process using given file.\n"
+                   "                  Receives same arguments as the main script.\n");
+			printf("    -p [+]nn      Set pool size to nn. If + used, adds to pool size.\n");
+			printf("    file          C file to run\n");
+			printf("    args...       Arguments to pass to running file\n");
+			printf("\n");
+			printf("Compilation information:\n");
+			printf("    char size   : %i bytes\n", sizeof(char));
+			printf("    number size : %i bytes\n", sizeof(int));
+			printf("    pointer size: %i bytes\n", sizeof(void*));
+			return 1;
+		} else {
+			dprintf(STDERR, "Invalid argument: %s, try -h\n", *argv);
 			free(vm_processes);
 			return -1;
 		}
 		--argc; ++argv;
 	}
-	if (vm_proc_count < 1 && argc < 1) { free(vm_processes); dprintf(STDERR, "usage: c5 [-L] [-s] [-d] [-v] [-c nnn] [-r file] file args...\n"); return -1; }
+	if (vm_proc_count < 1 && argc < 1) {
+		free(vm_processes);
+		dprintf(STDERR, "usage: %s [-L] [-s] [-d] [-v] [-c nn] [-r file] [-p nn] file args...\n", argv0);
+		return -1;
+	}
 	// Only add next arg as process if early parameter parsing was not invoked
 	if (early_param_exit == 0 && argc > 0) vm_processes[vm_proc_count++] = (int)*argv;
 

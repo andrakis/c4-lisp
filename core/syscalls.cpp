@@ -21,12 +21,6 @@
 
 using namespace C4;
 
-typedef NUMTYPE (syscall_init_t)(NUMTYPE, NUMTYPE);
-typedef NUMTYPE (syscall1_t)(NUMTYPE);
-typedef NUMTYPE (syscall2_t)(NUMTYPE,NUMTYPE);
-typedef NUMTYPE (syscall3_t)(NUMTYPE,NUMTYPE,NUMTYPE);
-typedef NUMTYPE (syscall4_t)(NUMTYPE,NUMTYPE,NUMTYPE,NUMTYPE);
-
 // Null platform implementation
 NUMTYPE null_init(NUMTYPE a, NUMTYPE b) {
 	throw Solar::null_function("syscall_init");
@@ -42,6 +36,9 @@ NUMTYPE null_sys3(NUMTYPE sig, NUMTYPE arg1, NUMTYPE arg2) {
 }
 NUMTYPE null_sys4(NUMTYPE sig, NUMTYPE arg1, NUMTYPE arg2, NUMTYPE arg3) {
 	throw Solar::null_function("syscall4");
+}
+NUMTYPE null_main(NUMTYPE argc, char **argv) {
+	throw Solar::null_function("syscall_main");
 }
 
 #if VERBOSE
@@ -70,6 +67,7 @@ struct platform_runtime VERBOSE_CONSTRUCTORS_INHERIT {
 	Solar::Func<syscall2_t> syscall2_f;
 	Solar::Func<syscall3_t> syscall3_f;
 	Solar::Func<syscall4_t> syscall4_f;
+	Solar::Func<syscall_main_t> syscall_main_f;
 
 	platform_runtime()
 		: VERBOSE_CONSTRUCTORS("platform_runtime")
@@ -78,7 +76,8 @@ struct platform_runtime VERBOSE_CONSTRUCTORS_INHERIT {
 		  syscall1_f(null_sys1),
 		  syscall2_f(null_sys2),
 		  syscall3_f(null_sys3),
-		  syscall4_f(null_sys4)
+		  syscall4_f(null_sys4),
+		  syscall_main_f(null_main)
 	{ }
 
 	platform_runtime(const char *runtime)
@@ -88,7 +87,8 @@ struct platform_runtime VERBOSE_CONSTRUCTORS_INHERIT {
 		  syscall1_f(rtl, "syscall1"),
 		  syscall2_f(rtl, "syscall2"),
 		  syscall3_f(rtl, "syscall3"),
-		  syscall4_f(rtl, "syscall4")
+		  syscall4_f(rtl, "syscall4"),
+		  syscall_main_f(rtl, "syscall_main", true)
 	{
 	}
 };
@@ -183,6 +183,10 @@ NUMTYPE platform_init(const char *runtime) noexcept {
 	}
 }
 
+void *platform_get() NOEXCEPT {
+	return reinterpret_cast<void*>(syscalls_runtime);
+}
+
 NUMTYPE syscall1(NUMTYPE signal) {
     return syscalls_runtime->syscall1_f(signal);
 }
@@ -201,4 +205,13 @@ NUMTYPE syscall4(NUMTYPE signal, NUMTYPE arg1, NUMTYPE arg2, NUMTYPE arg3) {
 
 NUMTYPE syscall_init(NUMTYPE section, NUMTYPE endmarker) {
 	return syscalls_runtime->syscall_init_f(section, endmarker);
+}
+
+NUMTYPE syscall_main(NUMTYPE argc, char **argv) {
+	if(syscalls_runtime->syscall_main_f.valid()) {
+		return syscalls_runtime->syscall_main_f(argc, argv);
+	} else {
+		dprintf(2, "syscall_main: missing from library\n");
+		return -1;
+	}
 }
