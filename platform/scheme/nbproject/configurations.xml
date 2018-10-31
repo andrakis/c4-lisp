@@ -56,12 +56,12 @@
           <commandLine>-Wno-format -rdynamic -Wall -Werror -Wno-error=unused-function</commandLine>
           <preprocessorList>
             <Elem>CND_PLATFORM="${CND_PLATFORM}"</Elem>
-            <Elem>DEBUG</Elem>
+            <Elem>CONF_${CND_CONF}=1</Elem>
             <Elem>GCC_RDYNAMIC</Elem>
+            <Elem>PROJECTNAME="${PROJECTNAME}"</Elem>
           </preprocessorList>
         </cTool>
         <ccTool>
-          <stripSymbols>true</stripSymbols>
           <standard>11</standard>
           <incDir>
             <pElem>../../include</pElem>
@@ -69,13 +69,14 @@
           <commandLine>-Wno-format -rdynamic -Wall -Werror -Wno-error=unused-function</commandLine>
           <preprocessorList>
             <Elem>CND_PLATFORM="${CND_PLATFORM}"</Elem>
+            <Elem>CONF_${CND_CONF}=1</Elem>
             <Elem>CPP14</Elem>
-            <Elem>DEBUG</Elem>
+            <Elem>PROJECTNAME="${PROJECTNAME}"</Elem>
             <Elem>RDYNAMIC</Elem>
           </preprocessorList>
         </ccTool>
         <linkerTool>
-          <output>../../lib/libscheme.${CND_CONF}-${CND_PLATFORM}.${CND_DLIB_EXT}</output>
+          <output>../../lib/lib${PROJECTNAME}.${CND_CONF}-${CND_PLATFORM}.${CND_DLIB_EXT}</output>
         </linkerTool>
       </compileType>
       <item path="../../include/platform/scheme/cell.h"
@@ -113,8 +114,8 @@
           <commandLine>-Wno-format</commandLine>
           <preprocessorList>
             <Elem>CND_PLATFORM="${CND_PLATFORM}"</Elem>
-            <Elem>NDEBUG</Elem>
-            <Elem>RELEASE</Elem>
+            <Elem>CONF_${CND_CONF}=1</Elem>
+            <Elem>PROJECTNAME="${PROJECTNAME}"</Elem>
           </preprocessorList>
         </cTool>
         <ccTool>
@@ -126,9 +127,9 @@
           <commandLine>-Wno-format</commandLine>
           <preprocessorList>
             <Elem>CND_PLATFORM="${CND_PLATFORM}"</Elem>
+            <Elem>CONF_${CND_CONF}=1</Elem>
             <Elem>CPP14</Elem>
-            <Elem>NDEBUG</Elem>
-            <Elem>RELEASE</Elem>
+            <Elem>PROJECTNAME="${PROJECTNAME}"</Elem>
           </preprocessorList>
         </ccTool>
         <fortranCompilerTool>
@@ -138,7 +139,7 @@
           <developmentMode>5</developmentMode>
         </asmTool>
         <linkerTool>
-          <output>../../lib/libscheme.${CND_CONF}-${CND_PLATFORM}.${CND_DLIB_EXT}</output>
+          <output>../../lib/lib${PROJECTNAME}.${CND_CONF}-${CND_PLATFORM}.${CND_DLIB_EXT}</output>
         </linkerTool>
       </compileType>
       <item path="../../include/platform/scheme/cell.h"

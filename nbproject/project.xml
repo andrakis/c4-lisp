@@ -3,13 +3,15 @@
     <type>org.netbeans.modules.cnd.makeproject</type>
     <configuration>
         <data xmlns="http://www.netbeans.org/ns/make-project/1">
-            <name>lisp4</name>
+            <name>c4-core</name>
             <c-extensions>c</c-extensions>
             <cpp-extensions>cpp</cpp-extensions>
             <header-extensions>h,hpp</header-extensions>
             <sourceEncoding>UTF-8</sourceEncoding>
             <make-dep-projects>
+                <make-dep-project>c4_modules/c4-internal</make-dep-project>
                 <make-dep-project>platform/scheme</make-dep-project>
+                <make-dep-project>c4_modules/c4-assembler</make-dep-project>
             </make-dep-projects>
             <sourceRootList>
                 <sourceRootElem>.</sourceRootElem>

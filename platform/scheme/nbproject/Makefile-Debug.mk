@@ -58,26 +58,26 @@ LDLIBSOPTIONS=
 
 # Build Targets
 .build-conf: ${BUILD_SUBPROJECTS}
-	"${MAKE}"  -f nbproject/Makefile-${CND_CONF}.mk ../../lib/libscheme.${CND_CONF}-${CND_PLATFORM}.${CND_DLIB_EXT}
+	"${MAKE}"  -f nbproject/Makefile-${CND_CONF}.mk ../../lib/lib${PROJECTNAME}.${CND_CONF}-${CND_PLATFORM}.${CND_DLIB_EXT}
 
-../../lib/libscheme.${CND_CONF}-${CND_PLATFORM}.${CND_DLIB_EXT}: ${OBJECTFILES}
+../../lib/lib${PROJECTNAME}.${CND_CONF}-${CND_PLATFORM}.${CND_DLIB_EXT}: ${OBJECTFILES}
 	${MKDIR} -p ../../lib
-	${LINK.cc} -o ../../lib/libscheme.${CND_CONF}-${CND_PLATFORM}.${CND_DLIB_EXT} ${OBJECTFILES} ${LDLIBSOPTIONS} -shared -fPIC
+	${LINK.cc} -o ../../lib/lib${PROJECTNAME}.${CND_CONF}-${CND_PLATFORM}.${CND_DLIB_EXT} ${OBJECTFILES} ${LDLIBSOPTIONS} -shared -fPIC
 
 ${OBJECTDIR}/scheme.o: nbproject/Makefile-${CND_CONF}.mk scheme.c 
 	${MKDIR} -p ${OBJECTDIR}
 	${RM} "$@.d"
-	$(COMPILE.c) -g -DCND_PLATFORM=\"${CND_PLATFORM}\" -DDEBUG -DGCC_RDYNAMIC -I../../include -fPIC  -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/scheme.o scheme.c
+	$(COMPILE.c) -g -DCND_PLATFORM=\"${CND_PLATFORM}\" -DCONF_${CND_CONF}=1 -DGCC_RDYNAMIC -DPROJECTNAME=\"${PROJECTNAME}\" -I../../include -fPIC  -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/scheme.o scheme.c
 
 ${OBJECTDIR}/scheme_internal.o: nbproject/Makefile-${CND_CONF}.mk scheme_internal.cpp 
 	${MKDIR} -p ${OBJECTDIR}
 	${RM} "$@.d"
-	$(COMPILE.cc) -g -s -DCND_PLATFORM=\"${CND_PLATFORM}\" -DCPP14 -DDEBUG -DRDYNAMIC -I../../include -std=c++14 -fPIC  -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/scheme_internal.o scheme_internal.cpp
+	$(COMPILE.cc) -g -DCND_PLATFORM=\"${CND_PLATFORM}\" -DCONF_${CND_CONF}=1 -DCPP14 -DPROJECTNAME=\"${PROJECTNAME}\" -DRDYNAMIC -I../../include -std=c++14 -fPIC  -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/scheme_internal.o scheme_internal.cpp
 
 ${OBJECTDIR}/syscalls.o: nbproject/Makefile-${CND_CONF}.mk syscalls.c 
 	${MKDIR} -p ${OBJECTDIR}
 	${RM} "$@.d"
-	$(COMPILE.c) -g -DCND_PLATFORM=\"${CND_PLATFORM}\" -DDEBUG -DGCC_RDYNAMIC -I../../include -fPIC  -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/syscalls.o syscalls.c
+	$(COMPILE.c) -g -DCND_PLATFORM=\"${CND_PLATFORM}\" -DCONF_${CND_CONF}=1 -DGCC_RDYNAMIC -DPROJECTNAME=\"${PROJECTNAME}\" -I../../include -fPIC  -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/syscalls.o syscalls.c
 
 # Subprojects
 .build-subprojects:
@@ -85,7 +85,7 @@ ${OBJECTDIR}/syscalls.o: nbproject/Makefile-${CND_CONF}.mk syscalls.c
 # Clean Targets
 .clean-conf: ${CLEAN_SUBPROJECTS}
 	${RM} -r ${CND_BUILDDIR}/${CND_CONF}
-	${RM} ../../lib/libscheme.${CND_CONF}-${CND_PLATFORM}.${CND_DLIB_EXT}
+	${RM} ../../lib/lib${PROJECTNAME}.${CND_CONF}-${CND_PLATFORM}.${CND_DLIB_EXT}
 
 # Subprojects
 .clean-subprojects:

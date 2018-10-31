@@ -5,6 +5,7 @@
                    displayName="Header Files"
                    projectFiles="true">
       <logicalFolder name="core" displayName="core" projectFiles="true">
+        <itemPath>include/core/c4_module.h</itemPath>
         <itemPath>include/core/c5_native.h</itemPath>
         <itemPath>include/core/except.h</itemPath>
         <itemPath>include/core/extras.h</itemPath>
@@ -64,7 +65,7 @@
           <incDir>
             <pElem>include</pElem>
           </incDir>
-          <commandLine>-Wno-format -rdynamic</commandLine>
+          <commandLine>-rdynamic</commandLine>
           <preprocessorList>
             <Elem>CND_PLATFORM="${CND_PLATFORM}"</Elem>
             <Elem>DEBUG</Elem>
@@ -76,7 +77,7 @@
           <incDir>
             <pElem>include</pElem>
           </incDir>
-          <commandLine>-Wno-format -rdynamic -Wall</commandLine>
+          <commandLine>-rdynamic -Wall</commandLine>
           <preprocessorList>
             <Elem>CND_PLATFORM="${CND_PLATFORM}"</Elem>
             <Elem>CPP14</Elem>
@@ -94,12 +95,32 @@
           <makeArtifact PL="platform/scheme"
                         CT="2"
                         CN="Debug"
-                        AC="false"
+                        AC="true"
                         BL="true"
                         WD="platform/scheme"
                         BC="${MAKE}  -f Makefile CONF=Debug"
                         CC="${MAKE}  -f Makefile CONF=Debug clean"
-                        OP="${CND_DISTDIR}/${CND_CONF}/${CND_PLATFORM}/libscheme.${CND_DLIB_EXT}">
+                        OP="../../lib/lib${PROJECTNAME}.${CND_CONF}-${CND_PLATFORM}.${CND_DLIB_EXT}">
+          </makeArtifact>
+          <makeArtifact PL="c4_modules/c4-assembler"
+                        CT="2"
+                        CN="Debug"
+                        AC="true"
+                        BL="true"
+                        WD="c4_modules/c4-assembler"
+                        BC="${MAKE}  -f Makefile CONF=Debug"
+                        CC="${MAKE}  -f Makefile CONF=Debug clean"
+                        OP="../../lib/libchasm.${CND_CONF}-${CND_PLATFORM}.${CND_DLIB_EXT}">
+          </makeArtifact>
+          <makeArtifact PL="c4_modules/c4-internal"
+                        CT="2"
+                        CN="Debug"
+                        AC="true"
+                        BL="true"
+                        WD="c4_modules/c4-internal"
+                        BC="${MAKE}  -f Makefile CONF=Debug"
+                        CC="${MAKE}  -f Makefile CONF=Debug clean"
+                        OP="../../lib/lib${PROJECTNAME}.${CND_CONF}-${CND_PLATFORM}.${CND_DLIB_EXT}">
           </makeArtifact>
         </requiredProjects>
       </compileType>
@@ -114,6 +135,8 @@
       <item path="core/main.cpp" ex="false" tool="1" flavor2="0">
       </item>
       <item path="core/syscalls.cpp" ex="false" tool="1" flavor2="0">
+      </item>
+      <item path="include/core/c4_module.h" ex="false" tool="3" flavor2="0">
       </item>
       <item path="include/core/c5_native.h" ex="false" tool="3" flavor2="0">
       </item>
@@ -146,7 +169,7 @@
           <incDir>
             <pElem>include</pElem>
           </incDir>
-          <commandLine>-Wno-format</commandLine>
+          <commandLine>-rdynamic</commandLine>
           <preprocessorList>
             <Elem>CND_PLATFORM="${CND_PLATFORM}"</Elem>
             <Elem>NDEBUG</Elem>
@@ -159,7 +182,7 @@
           <incDir>
             <pElem>include</pElem>
           </incDir>
-          <commandLine>-Wno-format</commandLine>
+          <commandLine>-rdynamic</commandLine>
           <preprocessorList>
             <Elem>CND_PLATFORM="${CND_PLATFORM}"</Elem>
             <Elem>CPP14</Elem>
@@ -182,12 +205,32 @@
           <makeArtifact PL="platform/scheme"
                         CT="2"
                         CN="Release"
-                        AC="true"
+                        AC="false"
                         BL="true"
                         WD="platform/scheme"
                         BC="${MAKE}  -f Makefile CONF=Release"
                         CC="${MAKE}  -f Makefile CONF=Release clean"
-                        OP="${CND_DISTDIR}/${CND_CONF}/${CND_PLATFORM}/libscheme.${CND_DLIB_EXT}">
+                        OP="../../lib/lib${PROJECTNAME}.${CND_CONF}-${CND_PLATFORM}.${CND_DLIB_EXT}">
+          </makeArtifact>
+          <makeArtifact PL="c4_modules/c4-assembler"
+                        CT="2"
+                        CN="Release"
+                        AC="false"
+                        BL="true"
+                        WD="c4_modules/c4-assembler"
+                        BC="${MAKE}  -f Makefile CONF=Release"
+                        CC="${MAKE}  -f Makefile CONF=Release clean"
+                        OP="../../lib/libchasm.${CND_CONF}-${CND_PLATFORM}.${CND_DLIB_EXT}">
+          </makeArtifact>
+          <makeArtifact PL="c4_modules/c4-internal"
+                        CT="2"
+                        CN="Release"
+                        AC="false"
+                        BL="true"
+                        WD="c4_modules/c4-internal"
+                        BC="${MAKE}  -f Makefile CONF=Release"
+                        CC="${MAKE}  -f Makefile CONF=Release clean"
+                        OP="../../lib/lib${PROJECTNAME}.${CND_CONF}-${CND_PLATFORM}.${CND_DLIB_EXT}">
           </makeArtifact>
         </requiredProjects>
       </compileType>
@@ -202,6 +245,8 @@
       <item path="core/main.cpp" ex="false" tool="1" flavor2="0">
       </item>
       <item path="core/syscalls.cpp" ex="false" tool="1" flavor2="0">
+      </item>
+      <item path="include/core/c4_module.h" ex="false" tool="3" flavor2="0">
       </item>
       <item path="include/core/c5_native.h" ex="false" tool="3" flavor2="0">
       </item>

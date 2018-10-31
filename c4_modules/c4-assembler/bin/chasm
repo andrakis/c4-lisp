@@ -1,0 +1,8 @@
+#!/bin/sh
+
+IP=`dirname \`readlink -e $0\``
+SRC=$IP/../c4_src
+TARGET=$SRC/chasm.c
+C4="$IP/c4"
+
+$C4 $TARGET $*

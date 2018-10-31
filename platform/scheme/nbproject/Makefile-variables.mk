@@ -9,16 +9,16 @@ CND_DISTDIR=dist
 # Debug configuration
 CND_PLATFORM_Debug=GNU-Linux
 CND_ARTIFACT_DIR_Debug=../../lib
-CND_ARTIFACT_NAME_Debug=libscheme.Debug-GNU-Linux.so
-CND_ARTIFACT_PATH_Debug=../../lib/libscheme.Debug-GNU-Linux.so
+CND_ARTIFACT_NAME_Debug=lib${PROJECTNAME}.Debug-GNU-Linux.so
+CND_ARTIFACT_PATH_Debug=../../lib/lib${PROJECTNAME}.Debug-GNU-Linux.so
 CND_PACKAGE_DIR_Debug=dist/Debug/GNU-Linux/package
 CND_PACKAGE_NAME_Debug=libscheme.so.tar
 CND_PACKAGE_PATH_Debug=dist/Debug/GNU-Linux/package/libscheme.so.tar
 # Release configuration
 CND_PLATFORM_Release=GNU-Linux
 CND_ARTIFACT_DIR_Release=../../lib
-CND_ARTIFACT_NAME_Release=libscheme.Release-GNU-Linux.so
-CND_ARTIFACT_PATH_Release=../../lib/libscheme.Release-GNU-Linux.so
+CND_ARTIFACT_NAME_Release=lib${PROJECTNAME}.Release-GNU-Linux.so
+CND_ARTIFACT_PATH_Release=../../lib/lib${PROJECTNAME}.Release-GNU-Linux.so
 CND_PACKAGE_DIR_Release=dist/Release/GNU-Linux/package
 CND_PACKAGE_NAME_Release=libscheme.so.tar
 CND_PACKAGE_PATH_Release=dist/Release/GNU-Linux/package/libscheme.so.tar

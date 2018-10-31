@@ -42,11 +42,11 @@ OBJECTFILES= \
 
 
 # C Compiler Flags
-CFLAGS=-Wno-format
+CFLAGS=-rdynamic
 
 # CC Compiler Flags
-CCFLAGS=-Wno-format
-CXXFLAGS=-Wno-format
+CCFLAGS=-rdynamic
+CXXFLAGS=-rdynamic
 
 # Fortran Compiler Flags
 FFLAGS=
@@ -88,6 +88,8 @@ ${OBJECTDIR}/core/syscalls.o: core/syscalls.cpp
 # Subprojects
 .build-subprojects:
 	cd platform/scheme && ${MAKE}  -f Makefile CONF=Release
+	cd c4_modules/c4-assembler && ${MAKE}  -f Makefile CONF=Release
+	cd c4_modules/c4-internal && ${MAKE}  -f Makefile CONF=Release
 
 # Clean Targets
 .clean-conf: ${CLEAN_SUBPROJECTS}
@@ -97,6 +99,8 @@ ${OBJECTDIR}/core/syscalls.o: core/syscalls.cpp
 # Subprojects
 .clean-subprojects:
 	cd platform/scheme && ${MAKE}  -f Makefile CONF=Release clean
+	cd c4_modules/c4-assembler && ${MAKE}  -f Makefile CONF=Release clean
+	cd c4_modules/c4-internal && ${MAKE}  -f Makefile CONF=Release clean
 
 # Enable dependency checking
 .dep.inc: .depcheck-impl
