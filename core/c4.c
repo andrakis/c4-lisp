@@ -1,5 +1,5 @@
 /**
- * Part of the c4-lisp (aka c5) project.
+ * Part of the c4-lisp project.
  * 
  * Original c4.c comments:
 	// c4.c - C in four functions
@@ -330,7 +330,7 @@ void expr(int lev)
 		else {
 			if (d[Class] == Loc) { *++e = LEA; *++e = loc - d[Val]; }
 			else if (d[Class] == Glo) { *++e = IMM; *++e = d[Val]; }
-			else { dprintf(STDERR, "%d: undefined variable\n", line); exit(-1); }
+			else { dprintf(STDERR, "%d: undefined variable (%ld)\n", line, d[Class]); exit(-1); }
 			*++e = ((ty = d[Type]) == CHAR) ? LC : LI;
 		}
 	}

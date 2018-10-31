@@ -8,12 +8,9 @@
 #include "core/syscalls.h"
 #include "core/solar.hpp"
 
-#define VERBOSE 0
-#if VERBOSE
-#define VERB(Code) Code
-#else
-#define VERB(Code)
-#endif
+extern "C" NUMTYPE verbose;
+
+#define VERB(Code) do { if(verbose) { Code; } } while(0);
 
 #ifndef NUMTYPE
 #define NUMTYPE long
@@ -84,10 +81,10 @@ struct platform_runtime VERBOSE_CONSTRUCTORS_INHERIT {
 		: VERBOSE_CONSTRUCTORS("platform_runtime")
 		  rtl(runtime),
 		  syscall_init_f(rtl, "syscall_init"),
-		  syscall1_f(rtl, "syscall1"),
-		  syscall2_f(rtl, "syscall2"),
-		  syscall3_f(rtl, "syscall3"),
-		  syscall4_f(rtl, "syscall4"),
+		  syscall1_f(rtl, "syscall1", true),
+		  syscall2_f(rtl, "syscall2", true),
+		  syscall3_f(rtl, "syscall3", true),
+		  syscall4_f(rtl, "syscall4", true),
 		  syscall_main_f(rtl, "syscall_main", true)
 	{
 	}
