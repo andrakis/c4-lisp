@@ -12,7 +12,7 @@
 #include "core/extras.h"
 
 int g_debug, g_tests;
-char *g_code;
+char *g_code, *g_argv0;
 
 // enum cell_type {
 enum { Symbol, Number, List, Proc, Lambda };
@@ -23,13 +23,14 @@ enum { STDIN, STDOUT, STDERR };
 // Special values
 enum { ENV_NOPARENT = 0 };
 
-void showhelp(char *argv0) {
+void showhelp() {
 	dprintf(STDERR, "lisp on c4\n");
-	dprintf(STDERR, "Invocation: %s [-d] [-t | code]\n", argv0);
-	dprintf(STDERR, "	-d      Enable debug mode\n");
-	dprintf(STDERR, "	-t      Run tests\n");
-	dprintf(STDERR, "	code    Code to run\n");
-	dprintf(STDERR, "\nIf no [code] is given, the following code is run:\n%s\n", g_code);
+	dprintf(STDERR, "Invocation: %s [-d] [file | -t | -e code]\n", g_argv0);
+	dprintf(STDERR, "	-d      Enable debug mode.\n");
+	dprintf(STDERR, "	file    Read and execute given file.\n");
+	dprintf(STDERR, "	-t      Run tests.\n");
+	dprintf(STDERR, "	-e code Code to run\n");
+	dprintf(STDERR, "\nIf no code or file is given, the following code is run:\n%s\n", g_code);
 }
 
 // enum Syscalls1 {
@@ -430,6 +431,7 @@ void *eval(void *x, void *env) {
 				}
 				result = (cell_strcmp(s_false, result) == 0) ? alt : conseq;
 				// recurse
+				//cell_free(x);
 				x = result;
 				flag_handled = 1;
 				
@@ -440,11 +442,13 @@ void *eval(void *x, void *env) {
 				return result;*/
 			}
 			if(cell_strcmp("set!", first) == 0) {	// (set! var exp)
+				//cell_free(x);
 				result = eval(cell_index(2, x), env);
 				env_set(cell_index(1, x), result, env);
 				return result;
 			}
 			if(cell_strcmp("define", first) == 0) {	// (define var exp)
+				//cell_free(x);
 				result = eval(cell_index(2, x), env);
 				env_set(cell_index(1, x), result, env);
 				return result;
@@ -462,6 +466,7 @@ void *eval(void *x, void *env) {
 					eval(cell_index(i++, x), env);
 				//return eval(cell_index(i, x), env);
 				// recurse
+				//cell_free(x);
 				x = cell_index(i, x);
 				flag_handled = 1;
 			}
@@ -483,12 +488,14 @@ void *eval(void *x, void *env) {
 					dprintf(STDERR, "\n");
 				}*/
 				t2 = eval(t1, env);
+				//cell_free(t1);
 				/*if(g_debug) {
 					dprintf(STDERR, " => ");
 					print_cell(t2);
 					dprintf(STDERR, "\n");
 				}*/
 				list_push_back(t2, exps);
+				//cell_free(t2);
 			}
 			type = cell_type(proc);
 			if(type == Lambda) {
@@ -508,7 +515,9 @@ void *eval(void *x, void *env) {
 				//if(g_debug) dprintf(STDERR, "  free exps\n");
 				list_free(exps);
 				// recurse
+				//cell_free(x);
 				x = cell_index(2, proc);
+				//env_free(env2);
 				env = env2;
 			} else if(type == Proc) {
 				if(g_debug) dprintf(STDERR, "  proc type Proc() => ");
@@ -519,6 +528,7 @@ void *eval(void *x, void *env) {
 					print_cell(result);
 					dprintf(STDERR, "\n");
 				}
+				//cell_free(x);
 				return result;
 			} else {
 				dprintf(STDERR, "Invalid call in eval\n");
@@ -570,7 +580,7 @@ int run_single_test(char *code, char *expected, void *env) {
 		dprintf(STDERR, ", code: %s", code);
 	dprintf(STDERR, "\n");
 	cstr_free(str);
-	//cell_free(tokens);
+	cell_free(tokens);
 	return no_match;
 }
 
@@ -671,25 +681,24 @@ void parse_args(int argc, char **argv) {
 			if (ch == 'd')
 				g_debug = 1;
 			else if(ch == 'h') {
-				showhelp(argv[-1]);
+				showhelp();
 				exit(1);
-			} else if(ch == 't') {
-				g_tests = 1;
-			} else if(ch == 'f') {
+			} else if(ch == 'e') {
 				if(argc == 0) {
-					dprintf(STDERR, "-f requires a filename. See -h.\n");
-					exit(2);
+					dprintf(STDERR, "-e requires an argument, try -h\n", *argv);
+					exit(1);
 				}
 				--argc; ++argv;
-				g_code = read_file(*argv);
-				--argc; ++argv;
+				// Code to run
+				g_code = *argv;
+			} else if(ch == 't') {
+				g_tests = 1;
 			} else {
 				dprintf(STDERR, "Unknown option %s, try -h\n", *argv);
 				exit(1);
 			}
 		} else {
-			// Code to run
-			g_code = *argv;
+			g_code = read_file(*argv);
 		}
 		--argc; ++argv;
 	}
@@ -703,6 +712,7 @@ int main(int argc, char **argv)
 	// setup globals
 	g_debug = 0;
 	g_source_mallocd = 0;
+	g_argv0 = argv[0];
 	//g_code = "(print (quote Hello))";
 	//g_code = "(print (quote Two plus 2 is) (+ 2 2))";
 	g_code =

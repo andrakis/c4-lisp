@@ -351,6 +351,24 @@ cell proc_print(const cells &args) {
 	return nil;
 }
 
+cell proc_equal (const cells &c) {
+	auto it = c.cbegin();
+	if(it == c.cend()) return false_sym;
+
+	const cell &item = *it; ++it;
+	while(it != c.cend()) {
+		const cell &curr = *it;
+		if(item != curr)
+			return false_sym;
+		++it;
+	}
+	return true_sym;
+}
+
+cell proc_nequal (const cells &c) {
+	return (proc_equal(c) == false_sym) ? true_sym : false_sym;
+}
+
 // define the bare minimum set of primintives necessary to pass the unit tests
 void add_globals(environment & env)
 {
@@ -362,6 +380,7 @@ void add_globals(environment & env)
 	env["-"] = cell(&proc_sub);      env["*"] = cell(&proc_mul);
 	env["/"] = cell(&proc_div);      env[">"] = cell(&proc_greater);
 	env["<"] = cell(&proc_less);     env["<="] = cell(&proc_less_equal);
+	env["="] = cell(&proc_equal);    env["!="] = cell(&proc_nequal);
 	env["print"] = cell(&proc_print);
 }
 
@@ -745,7 +764,7 @@ NUMTYPE internal_syscall2(NUMTYPE signal, NUMTYPE arg1) {
 		case SYS2_ENV_CSTR:
 			return c_env_cstr(arg1);
 		case SYS2_CSTR_FREE:
-			delete reinterpret_cast<char*>(arg1);
+			free(reinterpret_cast<char*>(arg1));
 			return 0;
 	}
 	

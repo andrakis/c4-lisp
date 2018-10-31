@@ -1,3 +1,4 @@
+#include "core/native.h"
 #include "core/syscalls.h"
 #include "platform/scheme/scheme.h"
 

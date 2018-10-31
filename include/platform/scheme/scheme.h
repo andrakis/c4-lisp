@@ -48,6 +48,23 @@ struct cell {
 	bool is_empty() const { return is_list() ? list.empty() : true; }
 	size_t list_size() const { return is_list() ? list.size() : 0; }
 	std::string str() const { return to_string(*this); }
+	bool operator==(const cell &other) const {
+		//if(other == this) return true;
+		if(other.type != type) return false;
+		switch(type) {
+			case Number: case Symbol:
+				return val == other.val;
+			case List: case Lambda:
+				return list == other.list && (type == Lambda ? (env == other.env) : true);
+			case Proc:
+				return proc == other.proc;
+			default:
+				return false;
+		}
+	}
+	bool operator!=(const cell &other) const {
+		return !(*this == other);
+	}
 };
 
 inline bool endswith(const std::string &search, const std::string &str) {

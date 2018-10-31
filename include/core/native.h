@@ -8,7 +8,7 @@
  *   TARGET_GLIBC: compiling for glibc (not all Linux platforms use it)
  *   NOEXCEPT  : on C: (empty), on C++: noexcept
  * These allow for platform handling behaviour based on compiler.
- * 
+ *
  * The following more specific defines are presently not used for other
  * purposes.
  *   HOST_LINUX
@@ -21,6 +21,17 @@
  * */
 #ifndef __NATIVE_H
 #define __NATIVE_H
+
+// Determine configuration from CONF_ macros
+#if !defined(DEBUG) && !defined(NDEBUG) && !defined(RELEASE)
+#if CONF_Debug
+#define DEBUG 1
+#elif CONF_Release
+#define RELEASE 1
+#else
+#error Could not ascertain build mode (CONF=Release|Debug)
+#endif
+#endif
 
 #ifdef __cplusplus
 	#define NOEXCEPT noexcept
@@ -93,6 +104,10 @@
 	#define TARGET_POSIX 1
 #endif
 
+#if TARGET_GCC
+#define GCC_VERSION (__GNUC__ * 10000 + __GNUC_MINOR__ * 100 + __GNUC_PATCHLEVEL__)
+#endif
+
 /* Final checks */
 #if !defined(ENV32BIT) && !defined(ENV64BIT)
 #error "Unable to detect architecture"
@@ -119,6 +134,7 @@
 
 #if TARGET_GCC
 #define RTL_SO "so"
+#include "core/gcc-settings.h"
 #else
 #error "Unable to determine shared object extension for this platform"
 #endif
