@@ -1,0 +1,83 @@
+#!/bin/bash
+
+# C4 Launcher
+# Expects either debug or release in same path.
+
+#set -x
+#set -a
+
+
+INV_PATH=$( dirname $( readlink -e $0 ) )
+ARCH=GNU-Linux # or or1k-musl, or whatever
+INV_DEBUG=
+INV_RELEASE=
+DISTFILE=lisp4 # Todo: change name
+ARGV0=$0
+PREFERRED=d    # d for debug, r for release
+
+showhelp () {
+	echo "C4 Launcher"
+	echo "Usage: $ARGV0 [-D | -R] args..."
+	echo "   -D         Run debug build"
+	echo "   -R         Run release build"
+	echo "   args...    Arguments to pass to C4"
+	echo "If no -d or -r given, attempts to find an executable (preferring debug)"
+}
+
+# $1 = path
+# $2 = filename
+find_exec () {
+	filename=$1/$2
+	if [ -e "$filename" ]; then
+		echo "$filename"
+		return 0
+	fi
+
+	return 1
+}
+
+INV_DEBUG=`find_exec $INV_PATH debug`
+if [ "$?" != "0" ]; then
+	INV_DEBUG=`find_exec $INV_PATH/../dist/Debug/$ARCH $DISTFILE`
+fi
+INV_RELEASE=`find_exec $INV_PATH release`
+if [ "$?" != "0" ]; then
+	INV_RELEASE=`find_exec $INV_PATH/../dist/Release/$ARCH $DISTFILE`
+fi
+
+# Check arguments
+if [ "$1" = "-D" ]; then
+	PREFERRED=d
+	shift
+elif [ "$1" = "-R" ]; then
+	PREFERRED=r
+	shift
+fi
+
+if [ "$INV_DEBUG"x"$INV_RELEASE"x = "xx" ]; then
+	echo "No runnable releases found" 2>&1
+	echo "$INV_DEBUG"
+	echo "$INV_RELEASE"
+	exit 1
+fi
+
+if [ "$PREFERRED" = "d" ]; then
+	if [ "$INV_DEBUG"x = "x" ]; then
+		echo "Debug build not found" 2>&1
+		exit 1
+	else
+		INV="$INV_DEBUG"
+	fi
+elif [ "$PREFERRED" = "r" ]; then
+	if [ "$INV_RELEASE"x = "x" ]; then
+		echo "Release build not found" 2>&1
+		exit 1
+	else
+		INV="$INV_DEBUG"
+	fi
+else
+	echo "Mismatch in requested build?"
+	exit 2
+fi
+
+$INV $@

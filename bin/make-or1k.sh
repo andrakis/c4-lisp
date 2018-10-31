@@ -5,7 +5,7 @@ set -e
 prefix=or1k-linux-musl
 cc=$prefix-gcc
 cxx=$prefix-g++
-files="bin lib/ lisp4.c c4.c c5.c lispc4_modules"
+files="bin lib/ lisp4.c c4.c c5.c c4_modules"
 platform="or1k-musl"
 bin_debug="dist/Debug/$platform/lisp4"
 bin_release="dist/Release/$platform/lisp4"
@@ -53,7 +53,7 @@ run_steps() {
 	cp ../$bin_release bin/release || true
 	cp -L ../*.c .
 	cp ../lib/*-or1k-musl.so lib
-	cp -r ../lispc4_modules .
+	cp -r ../c4_modules .
 	tar -$pkg_tar_opts -f ../$pkg_file $files
 	tar ttf ../$pkg_file
 	cd ..
