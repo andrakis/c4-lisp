@@ -313,7 +313,7 @@ LSCell eval_if(LSCell x, LSEnv *env) {
 	conseq = cell_index(x, 2);
 	alt = cell_index_or(x, 3, sym_nil);
 
-	if(!cell_strcmp(eval(test, env), (char*)sym_false.value))   // not match false
+	if(cell_strcmp(eval(test, env), (char*)sym_false.value))   // not match false
 		return eval(conseq, env);
 	else
 		return eval(alt, env);

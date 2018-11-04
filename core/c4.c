@@ -60,7 +60,7 @@ enum {
 	// VM related functions
 	PCHG /* Process changed */,
 	// Extended system calls (handled externally)
-	SYS1,SYS2,SYS3,SYS4,SYSI,SYSM,
+	SYS1,SYS2,SYS3,SYS4,SYS5,SYS6,SYSI,SYSM,
 	// Pointer to last element
 	_SYMS
 };
@@ -75,7 +75,7 @@ void setup_opcodes() {
 		"OPEN,READ,CLOS,PRTF,DPRT,MALC,FREE,MSET,MCMP,EXIT,FDSZ,"
 		"PINI,RPTH,PLGT,"
 		"PCHG,"
-		"SYS1,SYS2,SYS3,SYS4,SYSI,SYSM";
+		"SYS1,SYS2,SYS3,SYS4,SYS5,SYS6,SYSI,SYSM";
 }
 
 // Sets up the static data containing keywords and imported functions.
@@ -90,7 +90,7 @@ void setup_symbols() {
 		"platform_init runtime_path platform_get "
 		"process_changed "
 		// Syscalls
-		"syscall1 syscall2 syscall3 syscall4 syscall_init syscall_main "
+		"syscall1 syscall2 syscall3 syscall4 syscall5 syscall6 syscall_init syscall_main "
 		// void data type
 		"void "
 		// main
@@ -707,6 +707,8 @@ int run_cycle(int *process, int cycles) {
 		else if (i == SYS2) { a = (int)syscall2(sp[1], *sp); }
 		else if (i == SYS3) { a = (int)syscall3(sp[2], sp[1], *sp); }
 		else if (i == SYS4) { a = (int)syscall4(sp[3], sp[2], sp[1], *sp); }
+		else if (i == SYS5) { a = (int)syscall5(sp[4], sp[3], sp[2], sp[1], *sp); }
+		else if (i == SYS6) { a = (int)syscall6(sp[5], sp[4], sp[3], sp[2], sp[1], *sp); }
 		else if (i == SYSI) { a = (int)syscall_init(sp[1], *sp); }
 		else if (i == SYSM) { a = (int)syscall_main(sp[1], (char**)*sp); }
 		else if (i == FDSZ) { a = fdsize(*sp); }
@@ -741,12 +743,43 @@ int run_cycle(int *process, int cycles) {
 	return process[B_halted];
 }
 
+int *process_new() {
+	int *process;
+	if (!(process = (int*)malloc(__B * sizeof(int)))) { dprintf(STDERR, "Could not malloc(%d) process space\n", __B); return 0; }
+
+	memset((void*)process, 0, __B * sizeof(int));
+
+	process[B_magic] = B_MAGIC;
+	return process;
+
+}
+
+void process_init(int *process, int *sym, int *code, char *data, int *sp) {
+	process[B_p_sym] = (int)sym;
+	process[B_p_e] = (int)code;
+	process[B_p_data] = (int)data;
+	process[B_p_sp] = (int)sp;
+}
+
+void process_setmeta(int *process, int *sym, int *e, char *data) {
+	process[B_sym] = (int)sym;
+	process[B_e] = (int)e;
+	process[B_data] = (int)data;
+}
+
+void process_setregisters(int *process, int *bp, int *sp, int *pc) {
+	process[B_bp] = (int)bp;
+	process[B_sp] = (int)sp;
+	process[B_pc] = (int)pc;
+}
+
 int *create_process(char *source, int argc, char **argv) {
 	int *bp, *sp, *pc;
 	int *t;
 	int *process, *idmain;
 
-	if (!(process = (int*)malloc(__B * sizeof(int*)))) { dprintf(STDERR, "Could not malloc(%d) process space\n", __B); return 0; }
+	// Allocate process
+	if(!(process = process_new())) return 0;
 
 	// Reset globals
 	if (!(sym = malloc(poolsz))) { dprintf(STDERR, "could not malloc(%d) symbol area\n", poolsz); return 0; }
@@ -754,16 +787,18 @@ int *create_process(char *source, int argc, char **argv) {
 	if (!(data = malloc(poolsz))) { dprintf(STDERR, "could not malloc(%d) data area\n", poolsz); return 0; }
 	if (!(sp = malloc(poolsz))) { dprintf(STDERR, "could not malloc(%d) stack area\n", poolsz); return 0; }
 
-	process[B_p_sym] = (int)sym;
-	process[B_p_e] = (int)e;
-	process[B_p_data] = (int)data;
-	process[B_p_sp] = (int)sp;
-
 	memset(sym,  0, poolsz);
 	memset(e,    0, poolsz);
 	memset(data, 0, poolsz);
 
+	process_init(process, sym, e, data, sp);
+
 	if(!parse(source)) {
+		// TODO: this code is duplicated by free_process()
+		free((void*)process[B_p_sym]);
+		free((void*)process[B_p_e]);
+		free((void*)process[B_p_data]);
+		free(process);
 		dprintf(STDERR, "Failed to parse source\n");
 		return 0;
 	}
@@ -803,41 +838,32 @@ int *create_process(char *source, int argc, char **argv) {
 		dprintf(STDERR, "  main() entry point: %x\n", pc);
 	}
 
-	process[B_magic] = B_MAGIC;
-	process[B_exitcode] = 0;
-	process[B_sym] = (int)sym;
-	process[B_e] = (int)e;
-	process[B_data] = (int)data;
-	process[B_bp] = (int)bp;
-	process[B_sp] = (int)sp;
-	process[B_pc] = (int)pc;
-	process[B_a] = 0;
-	process[B_cycle] = 0;
-	process[B_halted] = 0;
-	process[B_platform] = 0;
+	process_setmeta(process, sym, e, data);
+	process_setregisters(process, bp, sp, pc);
 
 	return process;
 }
 
 void free_process(int *process) {
-	int *tmp;
+	int *prev_proc;
+	void *ptr;
 
 	if(process[B_magic] != B_MAGIC) {
 		printf("free_process(): invalid magic\n");
 		return;
 	}
 
-	tmp = vm_active_process;
+	prev_proc = vm_active_process;
 	change_process(process);
 	platform_init(0);
-	vm_active_process = tmp;
+	vm_active_process = prev_proc;
 
 	process[B_magic] = 0;
-	free((void*)process[B_p_e]);
-	free((void*)process[B_p_sp]);
-	free((void*)process[B_p_data]);
-	free((void*)process[B_p_sym]);
-	free((void*)process);
+	if( (ptr = (void*)process[B_p_e])) free(ptr);
+	if( (ptr = (void*)process[B_p_sp])) free(ptr);
+	if( (ptr = (void*)process[B_p_data])) free(ptr);
+	if( (ptr = (void*)process[B_p_sym])) free(ptr);
+	if( (ptr = (void*)process)) free(ptr);
 }
 
 int c5_lispmain(int argc, char **argv) {

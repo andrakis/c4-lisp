@@ -34,6 +34,12 @@ NUMTYPE null_sys3(NUMTYPE sig, NUMTYPE arg1, NUMTYPE arg2) {
 NUMTYPE null_sys4(NUMTYPE sig, NUMTYPE arg1, NUMTYPE arg2, NUMTYPE arg3) {
 	throw Solar::null_function("syscall4");
 }
+NUMTYPE null_sys5(NUMTYPE sig, NUMTYPE arg1, NUMTYPE arg2, NUMTYPE arg3, NUMTYPE arg4) {
+	throw Solar::null_function("syscall5");
+}
+NUMTYPE null_sys6(NUMTYPE sig, NUMTYPE arg1, NUMTYPE arg2, NUMTYPE arg3, NUMTYPE arg4, NUMTYPE arg5) {
+	throw Solar::null_function("syscall6");
+}
 NUMTYPE null_main(NUMTYPE argc, char **argv) {
 	throw Solar::null_function("syscall_main");
 }
@@ -64,6 +70,8 @@ struct platform_runtime VERBOSE_CONSTRUCTORS_INHERIT {
 	Solar::Func<syscall2_t> syscall2_f;
 	Solar::Func<syscall3_t> syscall3_f;
 	Solar::Func<syscall4_t> syscall4_f;
+	Solar::Func<syscall5_t> syscall5_f;
+	Solar::Func<syscall6_t> syscall6_f;
 	Solar::Func<syscall_main_t> syscall_main_f;
 
 	platform_runtime()
@@ -74,6 +82,8 @@ struct platform_runtime VERBOSE_CONSTRUCTORS_INHERIT {
 		  syscall2_f(null_sys2),
 		  syscall3_f(null_sys3),
 		  syscall4_f(null_sys4),
+		  syscall5_f(null_sys5),
+		  syscall6_f(null_sys6),
 		  syscall_main_f(null_main)
 	{ }
 
@@ -85,6 +95,8 @@ struct platform_runtime VERBOSE_CONSTRUCTORS_INHERIT {
 		  syscall2_f(rtl, "syscall2", true),
 		  syscall3_f(rtl, "syscall3", true),
 		  syscall4_f(rtl, "syscall4", true),
+		  syscall5_f(rtl, "syscall5", true),
+		  syscall6_f(rtl, "syscall6", true),
 		  syscall_main_f(rtl, "syscall_main", true)
 	{
 	}
@@ -198,6 +210,14 @@ NUMTYPE syscall3(NUMTYPE signal, NUMTYPE arg1, NUMTYPE arg2) {
 
 NUMTYPE syscall4(NUMTYPE signal, NUMTYPE arg1, NUMTYPE arg2, NUMTYPE arg3) {
     return syscalls_runtime->syscall4_f(signal, arg1, arg2, arg3);
+}
+
+NUMTYPE syscall5(NUMTYPE signal, NUMTYPE arg1, NUMTYPE arg2, NUMTYPE arg3, NUMTYPE arg4) {
+    return syscalls_runtime->syscall5_f(signal, arg1, arg2, arg3, arg4);
+}
+
+NUMTYPE syscall6(NUMTYPE signal, NUMTYPE arg1, NUMTYPE arg2, NUMTYPE arg3, NUMTYPE arg4, NUMTYPE arg5) {
+    return syscalls_runtime->syscall6_f(signal, arg1, arg2, arg3, arg4, arg5);
 }
 
 NUMTYPE syscall_init(NUMTYPE section, NUMTYPE endmarker) {
