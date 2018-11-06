@@ -22,15 +22,31 @@
 #ifndef __NATIVE_H
 #define __NATIVE_H
 
+#define DEFAULT_CONFIG_DEBUG 0
+#define DEFAULT_CONFIG_RELEASE 1
+// Should we abort if config cannot be defined?
+// Undefine the following to issue an #error if config not defined
+#define DEFAULT_CONFIG DEFAULT_CONFIG_DEBUG
+
 // Determine configuration from CONF_ macros
 #if !defined(DEBUG) && !defined(NDEBUG) && !defined(RELEASE)
-#if CONF_Debug
-#define DEBUG 1
-#elif CONF_Release
-#define RELEASE 1
-#else
-#error Could not ascertain build mode (CONF=Release|Debug)
-#endif
+	#if CONF_Debug
+		#define DEBUG 1
+	#elif CONF_Release
+		#define RELEASE 1
+	#else
+		#ifdef DEFAULT_CONFIG
+			#if DEFAULT_CONFIG == DEFAULT_CONFIG_DEBUG
+				#define DEBUG 1
+			#elif DEFAULT_CONFIG == DEFAULT_CONFIG_RELEASE
+				#define RELEASE 1
+			#else
+				#error Invalid DEFAULT_CONFIG value
+			#endif
+		#else
+			#error Could not ascertain build mode (CONF=Release|Debug)
+		#endif
+	#endif
 #endif
 
 #ifdef __cplusplus
@@ -105,7 +121,7 @@
 #endif
 
 #if TARGET_GCC
-#define GCC_VERSION (__GNUC__ * 10000 + __GNUC_MINOR__ * 100 + __GNUC_PATCHLEVEL__)
+#include "core/gcc-settings.h"
 #endif
 
 /* Final checks */
@@ -134,7 +150,6 @@
 
 #if TARGET_GCC
 #define RTL_SO "so"
-#include "core/gcc-settings.h"
 #else
 #error "Unable to determine shared object extension for this platform"
 #endif

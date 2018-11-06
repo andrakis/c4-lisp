@@ -37,7 +37,8 @@ int *e, *le,  // current position in emitted code
     src,      // print source and assembly flag
     debug,    // print executed instructions
     verbose,  // print more detailed info
-	poolsz;   // pool size
+    poolsz,   // pool size
+    min_pool; // whether to attempt to minimize code and data pool sizes
 // VM symbols
 int *vm_processes, *vm_active_process, vm_proc_max, vm_proc_count, vm_cycle_count;
 
@@ -117,6 +118,9 @@ enum {
 	B_i,  B_t, B_halted,
 	B_sym_iop_handler, // invalid operation handler
 	B_platform,        // Platform handle
+	B_entry,           // char*    Entry point of this process
+	B_argc,            // int      Number of arguments
+	B_argv,            // char**   Arguments as strings
 	__B
 };
 
@@ -148,6 +152,18 @@ int *lookup_symbol(char *name, int *symbols) {
 	}
 
 	return 0;
+}
+
+int count_symbols(int *symbols) {
+	int count;
+
+	count = 0;
+	while(symbols[Tk]) {
+		++count;
+		symbols = symbols + Idsz;
+	}
+
+	return count;
 }
 
 enum { RAD_OCTAL = 8, RAD_DECIMAL = 10, RAD_HEX = 16 };
@@ -773,6 +789,145 @@ void process_setregisters(int *process, int *bp, int *sp, int *pc) {
 	process[B_pc] = (int)pc;
 }
 
+int *create_c_image (char *source, int *process) {
+	int *sp, *bp, *pc, *t, *idmain;
+	char *entry, **argv; int argc;
+
+	entry = (char*)process[B_entry];
+	argc  = process[B_argc];
+	argv  = (char**)process[B_argv];
+	sp = (int*)process[B_p_sp];
+
+	// update globals
+	sym = (int*)process[B_p_sym];
+	e = le = (int*)process[B_p_e];
+	data = (char*)process[B_p_data];
+
+	if(!parse(source)) {
+		return 0;
+	}
+
+	idmain = lookup_symbol(entry, sym);
+	if (!idmain) { dprintf(STDERR, "%s() not defined\n", entry); return 0; }
+	pc = (int *)idmain[Val];
+
+	// Setup stack to point to top of allocated memory.
+	// As in many CPU architectures, the stack grows downwards from the top.
+	// If a stack overflow occurs, data may get overwritten.
+	bp = sp = (int *)((int)sp + poolsz);
+	// write stack values and small function to exit if main returns
+	//
+	//  [BOTTOM OF STACK]
+	//  [AVAILABLE STACK SPACE] // 0 to poolsz-5
+	//  $label0           // addr of return location, left on the
+	//                       stack so that the LEV instruction sets
+	//                       pc to the location of the PSH instruction.
+	//  // arguments to main
+	//  argv              //  char **argv
+	//  argc              //  int    argc
+	//  label0:           // return location, pc is set to this
+	//  PSH               // push value returned by main
+	//  EXIT              // and exit with it
+	//  [TOP OF STACK]
+	*--sp = EXIT; // call exit if main returns
+	*--sp = PSH; t = sp;
+	*--sp = argc;
+	*--sp = (int)argv;
+	*--sp = (int)t;
+
+	process[B_bp] = (int)bp;
+	process[B_sp] = (int)sp;
+	process[B_pc] = (int)pc;
+
+	return pc;
+}
+
+void minimize_pool_usage (char *source, int *process) {
+	int *our_sym, *our_e, *our_sp; char *our_data;
+	int *old_sym, *old_e, *old_sp; char *old_data;
+	int  tmp, sym_count, code_size, data_size;
+	int *our_pc;
+
+	// our sym_count and code_size must be 1 larger than calculated results,
+	// as we use a structure that has been memset to 0 to denote end of these.
+	sym_count = 1 + count_symbols(sym);
+	code_size = 1 + (int)(e - (int*)process[B_p_e]);
+	data_size = (int)(data - (char*)process[B_p_data]);
+
+	if(verbose) {
+		dprintf(STDERR, "Attempting to minimize pool usage:\n");
+		dprintf(STDERR, "	Symbol count: %ld\n", sym_count);
+		dprintf(STDERR, "	Code size: %ld\n", code_size);
+		dprintf(STDERR, "	Data size: %ld\n", data_size);
+	}
+
+	if(!(our_sym = malloc((tmp = sizeof(int) * Idsz * sym_count)))) {
+		dprintf(STDERR, "Failed to allocate %ld bytes for resized symbol pool (%ld symbols)\n",
+			tmp, sym_count);
+		return;
+	} else if(verbose) {
+		dprintf(STDERR, "Successfully allocated %ld bytes for resized symbol pool (%ld symbols)\n",
+			tmp, sym_count);
+	}
+	memset(our_sym, 0, tmp);
+
+	if(!(our_e = malloc(tmp = sizeof(int) * code_size))) {
+		dprintf(STDERR, "Failed to allocate %ld bytes for resized code pool\n", tmp);
+		free(our_sym);
+		return;
+	} else if(verbose) {
+		dprintf(STDERR, "Successfully allocated %ld bytes for resized code pool\n", tmp);
+	}
+	memset(our_e, 0, tmp);
+
+	if(!(our_data = malloc(tmp = data_size))) {
+		dprintf(STDERR, "Failed to allocate %ld bytes for resized data pool\n", tmp);
+		free(our_sym);
+		free(our_e);
+		return;
+	} else if(verbose) {
+		dprintf(STDERR, "Successfully allocated %ld bytes for resized data pool\n", tmp);
+	}
+	memset(our_data, 0, tmp);
+
+	// save values in case reparsing goes awry
+	if(verbose) dprintf(STDERR, "Saving and updating registers\n");
+	old_sym  = (int*)process[B_p_sym];
+	old_e    = (int*)process[B_p_e];
+	old_data = (char*)process[B_p_data];
+	process[B_p_sym] = process[B_sym] = (int)our_sym;
+	process[B_p_e]   = process[B_e] = (int)our_e;
+	process[B_p_data] = process[B_data] = (int)our_data;
+
+	// re-parse and emit code
+	if(verbose) dprintf(STDERR, "Reparsing source\n");
+	if(!(our_pc = create_c_image(source, process))) {
+		// failed :(
+		if(verbose) dprintf(STDERR, "Failed during reparse phase. Freeing temp pools.\n");
+
+		free(our_sym);
+		free(our_e);
+		free(our_data);
+		// restore old symbols
+		process[B_p_sym]  = (int)old_sym;
+		process[B_p_e]    = (int)old_e;
+		process[B_p_data] = (int)old_data;
+		return;
+	}
+
+	// successfully allocated and remitted, free old items
+	if(verbose)
+		dprintf(STDERR, "Freeing old pools.\n");
+	free(old_sym);
+	free(old_e);
+	free(old_data);
+
+	// update globals
+	//sym    = our_sym;
+	//e = le = our_e;
+	//data   = our_data;
+}
+
 int *create_process(char *source, int argc, char **argv) {
 	int *bp, *sp, *pc;
 	int *t;
@@ -780,6 +935,9 @@ int *create_process(char *source, int argc, char **argv) {
 
 	// Allocate process
 	if(!(process = process_new())) return 0;
+	process[B_argc] = argc;
+	process[B_argv] = (int)argv;
+	process[B_entry] = (int)"main";
 
 	// Reset globals
 	if (!(sym = malloc(poolsz))) { dprintf(STDERR, "could not malloc(%d) symbol area\n", poolsz); return 0; }
@@ -793,7 +951,7 @@ int *create_process(char *source, int argc, char **argv) {
 
 	process_init(process, sym, e, data, sp);
 
-	if(!parse(source)) {
+	if(!create_c_image(source, process)) {
 		// TODO: this code is duplicated by free_process()
 		free((void*)process[B_p_sym]);
 		free((void*)process[B_p_e]);
@@ -803,43 +961,20 @@ int *create_process(char *source, int argc, char **argv) {
 		return 0;
 	}
 
-	idmain = lookup_symbol("main", sym);
-	if (!idmain) { dprintf(STDERR, "main() not defined\n"); return 0; }
-	pc = (int *)idmain[Val];
-
-	// Setup stack to point to top of allocated memory.
-	// As in many CPU architectures, the stack grows downwards from the top.
-	// If a stack overflow occurs, data may get overwritten.
-	bp = sp = (int *)((int)sp + poolsz);
-    // write stack values and small function to exit if main returns
-    //
-    //  [BOTTOM OF STACK]
-	//  [AVAILABLE STACK SPACE] // 0 to poolsz-5
-    //  $label0           // addr of return location, left on the
-    //                       stack so that the LEV instruction sets
-    //                       pc to the location of the PSH instruction.
-    //  // arguments to main
-    //  argv              //  char **argv
-    //  argc              //  int    argc
-    //  label0:           // return location, pc is set to this
-    //  PSH               // push value returned by main
-    //  EXIT              // and exit with it
-    //  [TOP OF STACK]
-	*--sp = EXIT; // call exit if main returns
-	*--sp = PSH; t = sp;
-	*--sp = argc;
-	*--sp = (int)argv;
-	*--sp = (int)t;
+	if(min_pool) { // minimize pool usage?
+		minimize_pool_usage(source, process);
+	}
 
 	if(verbose) {
 		dprintf(STDERR, "Process image information:\n");
+		dprintf(STDERR, "  Symbols count: %ld\n", count_symbols((int*)process[B_p_sym]));
 		dprintf(STDERR, "  Emitted code size: %ld\n", (int)(e - (int*)process[B_p_e]));
 		dprintf(STDERR, "  Emitted data size: %ld\n", (int)(data - (char*)process[B_p_data]));
-		dprintf(STDERR, "  main() entry point: %x\n", pc);
+		dprintf(STDERR, "  %s() entry point: 0x%X\n", (char*)process[B_entry], process[B_pc]);
 	}
 
 	process_setmeta(process, sym, e, data);
-	process_setregisters(process, bp, sp, pc);
+	//process_setregisters(process, bp, sp, pc);
 
 	return process;
 }
@@ -898,6 +1033,7 @@ int main(int argc, char **argv)
 	verbose = 0;
 	vm_cycle_count = 1000;
 	poolsz = 256*1024; // arbitrary size
+	min_pool = 0;
 
 	// Allocate vm_processes
 	vm_proc_max = 32;
@@ -939,6 +1075,9 @@ int main(int argc, char **argv)
 					dprintf(STDERR, "Pool size set to 0x%x bytes\n", poolsz);
 			}
 		}
+		// -M      minimize code and data pool sizes
+		else if(ch == 'M')
+			min_pool = 1;
 		// -r xyz  start additional process
 		else if(ch == 'r') {
 			--argc; ++argv;
@@ -970,14 +1109,15 @@ int main(int argc, char **argv)
 			printf("C4: The self-hosting C interpreter, originally by Robert Swierczek\n");
 			printf("  : with additions by Julian Thatcher\n");
 			printf("usage: %s [-L] [-s] [-d] [-v] [-c nn] [-r file] [-p [+]nn] file args...\n", argv0);
-            printf("    -L            Load default platform library, and enter main\n");
-            printf("    -s            Print source and exit\n");
-            printf("    -d            Enable debugging mode\n");
-            printf("    -v            Enable verbose mode\n");
-            printf("    -c nn         Set process cycle count to nnn\n");
-            printf("    -r file       Start additional process using given file.\n"
-                   "                  Receives same arguments as the main script.\n");
+			printf("    -L            Load default platform library, and enter main\n");
+			printf("    -s            Print source and exit\n");
+			printf("    -d            Enable debugging mode\n");
+			printf("    -v            Enable verbose mode\n");
+			printf("    -c nn         Set process cycle count to nnn\n");
+			printf("    -r file       Start additional process using given file.\n"
+			       "                  Receives same arguments as the main script.\n");
 			printf("    -p [+]nn      Set pool size to nn. If + used, adds to pool size.\n");
+			printf("    -M            Attempt to minimize pool sizes for code and data\n");
 			printf("    file          C file to run\n");
 			printf("    args...       Arguments to pass to running file\n");
 			printf("\n");
@@ -995,7 +1135,7 @@ int main(int argc, char **argv)
 	}
 	if (vm_proc_count < 1 && argc < 1) {
 		free(vm_processes);
-		dprintf(STDERR, "usage: %s [-L] [-s] [-d] [-v] [-c nn] [-r file] [-p nn] file args...\n", argv0);
+		dprintf(STDERR, "usage: %s [-L] [-s] [-d] [-v] [-c nn] [-r file] [-p nn] [-M] file args...\n", argv0);
 		return -1;
 	}
 	// Only add next arg as process if early parameter parsing was not invoked
