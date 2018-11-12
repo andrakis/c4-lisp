@@ -146,15 +146,15 @@ enum /* PMod */ {
 };
 
 // Linked list functions
-int *list__alloc () { return (int*)malloc(sizeof(int) * PM_size); }
-int *list_new (void *data, int *tail) {
+int *c4_list__alloc () { return (int*)malloc(sizeof(int) * PM_size); }
+int *c4_list_new (void *data, int *tail) {
 	int *l;
-	if(!(l = list__alloc())) return 0;
+	if(!(l = c4_list__alloc())) return 0;
 	l[LL_head] = (int)data;
 	l[LL_tail] = (int)tail;
 	return l;
 }
-void list_free (int *l) {
+void c4_list_free (int *l) {
 	int *next;
 	while(l) {
 		next = (int*)l[LL_tail];
@@ -638,7 +638,7 @@ int *code_pages_push_uniq (char *pointer) {
 		return candidate;
 	}
 
-	code_pages = list_new((void*)pointer, code_pages);
+	code_pages = c4_list_new((void*)pointer, code_pages);
 	return code_pages;
 }
 
@@ -1259,7 +1259,7 @@ int main(int argc, char **argv)
 	search_paths[i] = 0;
 
 	// Allocate first code page
-	code_pages = list_new(0, 0); // empty entry as tail
+	code_pages = c4_list_new(0, 0); // empty entry as tail
 
 	--argc; ++argv;
 	early_param_exit = 0; // when to exit parameter parsing
