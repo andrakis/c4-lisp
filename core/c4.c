@@ -25,6 +25,7 @@
 char *p, *lp, // current position in source code
      *data,   // data/bss pointer
      *opcodes;// opcodes string
+char **search_paths;
 // Additional shared data and program flags
 int *e, *le,  // current position in emitted code
     *id,      // currently parsed identifier
@@ -42,11 +43,14 @@ int *e, *le,  // current position in emitted code
 // VM symbols
 int *vm_processes, *vm_active_process, vm_proc_max, vm_proc_count, vm_cycle_count;
 
+enum { SEARCH_PATHS_MAX = 16 };
+
 // tokens and classes (operators last and in precedence order)
 enum {
 	Num = 128, Fun, Sys, Glo, Loc, Id,
-	Char, Else, Enum, If, Int, Return, Sizeof, While,
-	Assign, Cond, Lor, Lan, Or, Xor, And, Eq, Ne, Lt, Gt, Le, Ge, Shl, Shr, Add, Sub, Mul, Div, Mod, Inc, Dec, Brak
+	Char = 134, Else, Enum, If, Int, Return, Sizeof, Module, While,
+	Assign = 143, Cond, Lor, Lan, Or, Xor, And, Eq, Ne, Lt, Gt, Le,
+	Ge = 155, Shl, Shr, Add, Sub, Mul, Div, Mod, Inc, Dec, Brak
 };
 
 // opcodes
@@ -84,10 +88,10 @@ void setup_symbols() {
 	// Must match sequence of instructions enum
 	p = 
 		// Keywords
-		"char else enum if int return sizeof while "
+		"char else enum if int return sizeof module while "
 		// C functions
 		"open read close printf dprintf malloc free memset memcmp exit fdsize "
-		// Dynamci runtime platform functions
+		// Dynamic runtime platform functions
 		"platform_init runtime_path platform_get "
 		"process_changed "
 		// Syscalls
@@ -116,13 +120,48 @@ enum {
 	B_p_sym, B_p_e, B_p_data, B_p_sp,   // process initial values
 	B_pc, B_bp, B_sp, B_a, B_cycle,
 	B_i,  B_t, B_halted,
-	B_sym_iop_handler, // invalid operation handler
-	B_platform,        // Platform handle
+	B_sym_iop_handler, // void*    Invalid operation handler
+	B_platform,        // void*    Platform handle
 	B_entry,           // char*    Entry point of this process
 	B_argc,            // int      Number of arguments
 	B_argv,            // char**   Arguments as strings
+	B_modules,         // int*     Linked list of modules
 	__B
 };
+
+// Linked list members
+enum /* LinkedList */ {
+	LL_head,    // void* Data
+	LL_tail,    // int*  Next linked list
+	LL_size     // End marker
+};
+
+// Process module members
+enum /* PMod */ {
+	PM_syms,   // int*   Symbols
+	PM_code,   // int*   Code segment
+	PM_data,   // char*  Data segment
+	PM_stack,  // int*   Stack segment
+	PM_size    // End marker
+};
+
+// Linked list functions
+int *list__alloc () { return (int*)malloc(sizeof(int) * PM_size); }
+int *list_new (void *data, int *tail) {
+	int *l;
+	if(!(l = list__alloc())) return 0;
+	l[LL_head] = (int)data;
+	l[LL_tail] = (int)tail;
+	return l;
+}
+void list_free (int *l) {
+	int *next;
+	while(l) {
+		next = (int*)l[LL_tail];
+		free(l);
+		l = next;
+	}
+}
 
 int  *get_vm_active_process() { return vm_active_process; }
 void *get_process_platform(int *process) {
@@ -133,18 +172,21 @@ void  set_process_platform(void *platform, int *process) {
 	process[B_platform] = (int)platform;
 }
 
+int our_strlen (char *s1) {
+	char *s2;
+	s2 = s1;
+	while(*s2) { ++s2; }
+	return s2 - s1;
+}
+
 // Lookup an item by name in the symbol table
 int *lookup_symbol(char *name, int *symbols) {
 	int name_len;
 	int *symbol;
-	char *tmp;
 
-	// inline strlen
-	name_len = 0;
-	tmp = name;
-	while(*tmp) { ++name_len; ++tmp; }
-
+	name_len = our_strlen(name);
 	symbol = symbols;
+
 	while(symbol[Tk]) {
 		if(symbol[NameLen] == name_len && !memcmp((char *)symbol[Name], name, name_len))
 			return symbol;
@@ -197,7 +239,7 @@ void next()
 
 	while (tk = *p) {
 		++p;
-		if (tk == '\n') {
+		if (tk == '\n') {         // newline handling
 			if (src) {
 				dprintf(STDERR, "%d: %.*s", line, p - lp, lp);
 				lp = p;
@@ -208,9 +250,10 @@ void next()
 			}
 			++line;
 		}
-		else if (tk == '#') {
+		else if (tk == '#') {     // preprocessor directives ignored
 			while (*p != 0 && *p != '\n') ++p;
 		}
+		// variable handling
 		else if ((tk >= 'a' && tk <= 'z') || (tk >= 'A' && tk <= 'Z') || tk == '_') {
 			pp = p - 1;
 			while ((*p >= 'a' && *p <= 'z') || (*p >= 'A' && *p <= 'Z') || (*p >= '0' && *p <= '9') || *p == '_')
@@ -227,6 +270,7 @@ void next()
 			tk = id[Tk] = Id;
 			return;
 		}
+		// number handling
 		else if (tk >= '0' && tk <= '9') {
 			// Decimal
 			if (ival = tk - '0')
@@ -264,6 +308,7 @@ void next()
 				return;
 			}
 		}
+		// Character and string handling
 		else if (tk == '\'' || tk == '"') {
 			pp = data;
 			while (*p != 0 && *p != tk) {
@@ -509,17 +554,112 @@ void stmt()
 	}
 }
 
-int parse(char *source) {
+// Attempt to open a file in the given search path
+int open_path(char *prefix, char *suffix, int mode) {
+	char *path, *src, *dst;
+	int fd;
+
+	if(!(path = malloc(our_strlen(prefix) + our_strlen(suffix) + 2 /* for nul and sep */))) return 0;
+	// inline strcpy and strcat
+	dst = path;
+	while(*prefix) *dst++ = *prefix++; *dst++ = '/';
+	while(*suffix) *dst++ = *suffix++;
+	*dst++ = 0;
+
+	if(verbose) dprintf(STDERR, "open_path(), openning '%s': ", path);
+	fd = open(path, mode);
+	if(verbose) dprintf(STDERR, "%ld\n", fd);
+	free(path);
+	return fd;
+}
+
+char *read_module(char *path) {
+	char **paths_it;
+	char  *paths_current;
+	int   fd, bytes;
+	char *result;
+
+	fd = 0;
+
+	paths_it = search_paths;
+	if(verbose) dprintf(STDERR, "paths_it: 0x%X\n", paths_it);
+	if(verbose) dprintf(STDERR, "*paths_it: 0x%X\n", *paths_it);
+	while(*paths_it && fd <= 0) {
+		if(verbose) dprintf(STDERR, "Attempt to open module with path: '%s%s'\n", *paths_it, path);
+		if((fd = open_path(*paths_it, path, 0)) < 0)
+			++paths_it;
+	}
+
+	if(fd < 0) {
+		dprintf(STDERR, "Unable to open module '%s'\n", path);
+		return 0;
+	}
+
+	bytes = fdsize(fd) + 1;
+	if(!(result = malloc(bytes))) {
+		close(fd);
+		dprintf(STDERR, "Failed to allocate %ld bytes needed for source\n", bytes);
+		return 0;
+	}
+
+	bytes = read(fd, result, bytes);
+	close(fd);
+	if(bytes <= 0) {
+		free(result);
+		dprintf(STDERR, "Module file '%s': read failed, return code = %ld\n", path, bytes);
+		return 0;
+	}
+
+	result[bytes] = 0;
+	return result;
+}
+
+int *code_pages; // linked list
+
+int *code_pages_find(char *value) {
+	int *page;
+	void *p;
+
+	page = code_pages;
+	while((p = (void*)page[LL_head])) {
+		if(verbose) dprintf(STDERR, " checking page 0x%X against 0x%X\n", p, (void*)value);
+		if(p == (void*)value) return page;
+		page = (int*)page[LL_tail];
+	}
+
+	return 0;
+}
+
+// Ensure that pointer is not already in list, and add it if so
+int *code_pages_push_uniq (char *pointer) {
+	int *candidate;
+
+	if((candidate = code_pages_find(pointer))) {
+		return candidate;
+	}
+
+	code_pages = list_new((void*)pointer, code_pages);
+	return code_pages;
+}
+
+void code_pages_free () {
+	int *page, *next;
+	page = code_pages;
+	while((next = (int*)page[LL_tail])) {
+		if(verbose) dprintf(STDERR, "  free code page 0x%X\n", page[LL_head]);
+		free((int*)page[LL_head]);
+		free(page);
+		page = next;
+	}
+	// free first page
+	free(page);
+}
+
+
+// uses globals: p, code_pages
+int partial_parse () {
 	int i, bt, ty;
-	setup_symbols();
-
-	i = Char; while (i <= While) { next(); id[Tk] = i++; } // add keywords to symbol table
-	i = OPEN; while (i < _SYMS) { next(); id[Class] = Sys; id[Type] = INT; id[Val] = i++; } // add library to symbol table
-	next(); id[Tk] = Char; // handle void type
-	next();
-
-	// update global used in parsing process
-	p = source;
+	char *ptmp, *pp; int linetmp;
 
 	// parse declarations
 	line = 1;
@@ -549,10 +689,37 @@ int parse(char *source) {
 				next();
 			}
 		}
+		// module("path_to_file")
+		else if (tk == Module) {
+			if(verbose) { dprintf(STDERR, "enter module section\n"); }
+			next();
+			while(tk != '(') next(); next(); // skip (
+			next(); // read string into ival
+			while(tk != ')') next(); // skip )
+			if(verbose) { dprintf(STDERR, "  load module '%s'\n", (char*)ival); }
+			// save current code position and load requested file
+			ptmp = p; linetmp = line;
+			p = read_module((char*)ival);
+			if(pp = p) {
+				if(!code_pages_push_uniq(p)) {
+					free(p);
+					dprintf(STDERR, "Failed to allocate code page\n");
+					return 0;
+				} else if(verbose) dprintf(STDERR, "  code page successfully allocated\n");
+				ival = partial_parse();
+				if(!ival) {
+					dprintf(STDERR, "  partial_parse() failed in submodule\n");
+					return 0;
+				} else if(verbose) dprintf(STDERR, "  module loaded successfully\n");
+			}
+			if(verbose) dprintf(STDERR, "exit module section\n");
+			p = ptmp; line = linetmp; // continue with processing
+			next(); // ensures tk == ;
+		}
 		while (tk != ';' && tk != '}') {
 			ty = bt;
 			while (tk == Mul) { next(); ty = ty + PTR; }
-			if (tk != Id) { dprintf(STDERR, "%d: bad global declaration\n", line); return 0; }
+			if (tk != Id) { dprintf(STDERR, "%d: bad global declaration with tk %ld\n", line, tk); return 0; }
 			if (id[Class]) { dprintf(STDERR, "%d: duplicate global definition for %.*s\n", line, id[NameLen], id[Name]); return 0; }
 			next();
 			id[Type] = ty;
@@ -617,6 +784,26 @@ int parse(char *source) {
 	}
 
 	return 1;
+}
+
+int parse(char *source) {
+	int i;
+	setup_symbols();
+
+	i = Char; while (i <= While) { next(); id[Tk] = i++; } // add keywords to symbol table
+	i = OPEN; while (i < _SYMS) { next(); id[Class] = Sys; id[Type] = INT; id[Val] = i++; } // add library to symbol table
+	next(); id[Tk] = Char; // handle void type
+	next();
+
+	// update global used in parsing process
+	p = source;
+	// Add code page to list
+	if(!code_pages_push_uniq(p)) {
+		dprintf(STDERR, "Failed to add new code page\n");
+		return 0;
+	}
+
+	return partial_parse();
 }
 
 // VM processing
@@ -808,7 +995,15 @@ int *create_c_image (char *source, int *process) {
 	}
 
 	idmain = lookup_symbol(entry, sym);
-	if (!idmain) { dprintf(STDERR, "%s() not defined\n", entry); return 0; }
+	if (!idmain) {
+		dprintf(STDERR, "%s() not defined\n", entry);
+		dprintf(STDERR, " entry: 0x%X\n", entry);
+		dprintf(STDERR, " sym: 0x%X\n", sym);
+		dprintf(STDERR, " e: 0x%X\n", e);
+		dprintf(STDERR, " data: 0x%X\n", data);
+		dprintf(STDERR, " sp: 0x%X\n", sp);
+		return 0;
+	}
 	pc = (int *)idmain[Val];
 
 	// Setup stack to point to top of allocated memory.
@@ -974,7 +1169,6 @@ int *create_process(char *source, int argc, char **argv) {
 	}
 
 	process_setmeta(process, sym, e, data);
-	//process_setregisters(process, bp, sp, pc);
 
 	return process;
 }
@@ -1014,6 +1208,13 @@ int c5_lispmain(int argc, char **argv) {
 	return result;
 }
 
+// Perform actions (mostly freeing memory) that should occur before the application exits
+void early_exit () {
+	free((void*)vm_processes);
+	free((void*)search_paths);
+	code_pages_free();
+}
+
 // Override name when compiling natively
 #define main c5_main
 int main(int argc, char **argv)
@@ -1041,6 +1242,24 @@ int main(int argc, char **argv)
 	if (!(vm_processes = (int*)malloc(vm_proc_max * sizeof(int*)))) { dprintf(STDERR, "Failed to allocate vm_processes area\n"); return -1; }
 	memset(vm_processes, 0, vm_proc_max * sizeof(int*));
 	vm_active_process = 0;
+
+	// Allocate search paths
+	if(!(search_paths = (char**)malloc(SEARCH_PATHS_MAX * sizeof(char*)))) { dprintf(STDERR, "Failed to allocate search_paths\n"); return -1; }
+	// copy pointers for search paths
+	tmp = ".\0"              // default: use path as given
+	      "./c4_modules\0"   // c4_modules/
+	      "\0\0";            // end of list
+	i = 0;
+	while(*tmp) {
+		search_paths[i++] = tmp;
+		while(*tmp) ++tmp; // search for nul
+		++tmp; // skip nul
+		// loop will exit when tmp stays nul
+	}
+	search_paths[i] = 0;
+
+	// Allocate first code page
+	code_pages = list_new(0, 0); // empty entry as tail
 
 	--argc; ++argv;
 	early_param_exit = 0; // when to exit parameter parsing
@@ -1093,7 +1312,7 @@ int main(int argc, char **argv)
 			++argc; --argv; // set arguments correctly
 			if(0) // Dummy out the next call
 #else
-				free(vm_processes);
+				early_exit();
 #if 0
 			if(0) // Dummy out the next call
 #endif
@@ -1125,16 +1344,17 @@ int main(int argc, char **argv)
 			printf("    char size   : %i bytes\n", sizeof(char));
 			printf("    number size : %i bytes\n", sizeof(int));
 			printf("    pointer size: %i bytes\n", sizeof(void*));
+			printf("    process size: %i bytes (%i words)\n", sizeof(int) * __B, __B);
 			return 1;
 		} else {
 			dprintf(STDERR, "Invalid argument: %s, try -h\n", *argv);
-			free(vm_processes);
+			early_exit();
 			return -1;
 		}
 		--argc; ++argv;
 	}
 	if (vm_proc_count < 1 && argc < 1) {
-		free(vm_processes);
+		early_exit();
 		dprintf(STDERR, "usage: %s [-L] [-s] [-d] [-v] [-c nn] [-r file] [-p nn] [-M] file args...\n", argv0);
 		return -1;
 	}
@@ -1162,7 +1382,6 @@ int main(int argc, char **argv)
 		p[ii] = 0;
 		close(fd);
 		process = create_process(p, argc, argv);
-		free((void*)pp);
 		if(process != 0) vm_processes[i] = (int)process;
 		++i;
 	}
@@ -1186,7 +1405,8 @@ int main(int argc, char **argv)
 		if(i == vm_proc_max) i = 0;
 	}
 
-	free((void*)vm_processes);
+	// Perform normal cleanup
+	early_exit();
 
 	return exitcode;
 }
