@@ -67,18 +67,6 @@
             <pElem>../../lib</pElem>
           </linkerAddLib>
         </linkerTool>
-        <requiredProjects>
-          <makeArtifact PL="../../c4-internal"
-                        CT="2"
-                        CN="Debug"
-                        AC="false"
-                        BL="true"
-                        WD="../../c4-internal"
-                        BC="${MAKE}  -f Makefile CONF=Debug"
-                        CC="${MAKE}  -f Makefile CONF=Debug clean"
-                        OP="../lib/libinternal.${CND_CONF}-${CND_PLATFORM}.${CND_DLIB_EXT}">
-          </makeArtifact>
-        </requiredProjects>
       </compileType>
       <item path="lib_src/libinternal.c" ex="false" tool="0" flavor2="0">
       </item>
@@ -120,18 +108,6 @@
             <pElem>../../lib</pElem>
           </linkerAddLib>
         </linkerTool>
-        <requiredProjects>
-          <makeArtifact PL="../../c4-internal"
-                        CT="2"
-                        CN="Release"
-                        AC="true"
-                        BL="true"
-                        WD="../../c4-internal"
-                        BC="${MAKE}  -f Makefile CONF=Release"
-                        CC="${MAKE}  -f Makefile CONF=Release clean"
-                        OP="../lib/libinternal.${CND_CONF}-${CND_PLATFORM}.${CND_DLIB_EXT}">
-          </makeArtifact>
-        </requiredProjects>
       </compileType>
       <item path="lib_src/libinternal.c" ex="false" tool="0" flavor2="9">
       </item>

@@ -8,9 +8,7 @@
             <cpp-extensions/>
             <header-extensions/>
             <sourceEncoding>UTF-8</sourceEncoding>
-            <make-dep-projects>
-                <make-dep-project>../../c4-internal</make-dep-project>
-            </make-dep-projects>
+            <make-dep-projects/>
             <sourceRootList/>
             <confList>
                 <confElem>
