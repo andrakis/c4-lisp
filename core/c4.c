@@ -846,7 +846,7 @@ int run_cycle(int *process, int cycles) {
 		i = *pc++; ++cycle;
 		if (debug) {
 		  dprintf(STDERR, "%d> %.4s", cycle, &opcodes[i * 5]);
-		  if (i <= ADJ) dprintf(STDERR, " %d\n", *pc); else dprintf(STDERR, "\n");
+		  if (i <= ADJ) dprintf(STDERR, " %ld\n", *pc); else dprintf(STDERR, "\n");
 		}
 		// Basic VM operations
 		// LEA: move A, BP + [ptr PC]; inc PC
