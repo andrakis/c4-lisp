@@ -1,9 +1,11 @@
 *.o
+*.so
 /build/
 /dist/
 /platform/scheme/build/
 /platform/scheme/dist/
 *.swp
+*.swo
 *~
 /c4_modules/c4-assembler/build/
 /c4-internal/build/
@@ -11,3 +13,4 @@
 /c4-internal/dist/
 /or1k/c4_modules/c4-internal/build/
 /or1k/c4_modules/c4-assembler/build/
+
