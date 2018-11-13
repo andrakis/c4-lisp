@@ -5,7 +5,7 @@
 // Non-C4 stuff
 #define module(Name)
 
-module("c4_samples/.c");
+include("c4_samples/.c");
 
 int main (int argc, char **argv) {
 	int x, y;

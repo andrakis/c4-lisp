@@ -88,7 +88,7 @@ void setup_symbols() {
 	// Must match sequence of instructions enum
 	p = 
 		// Keywords
-		"char else enum if int return sizeof module while "
+		"char else enum if int return sizeof include while "
 		// C functions
 		"open read close printf dprintf malloc free memset memcmp exit fdsize "
 		// Dynamic runtime platform functions
@@ -125,7 +125,6 @@ enum {
 	B_entry,           // char*    Entry point of this process
 	B_argc,            // int      Number of arguments
 	B_argv,            // char**   Arguments as strings
-	B_modules,         // int*     Linked list of modules
 	__B
 };
 
@@ -136,17 +135,8 @@ enum /* LinkedList */ {
 	LL_size     // End marker
 };
 
-// Process module members
-enum /* PMod */ {
-	PM_syms,   // int*   Symbols
-	PM_code,   // int*   Code segment
-	PM_data,   // char*  Data segment
-	PM_stack,  // int*   Stack segment
-	PM_size    // End marker
-};
-
 // Linked list functions
-int *c4_list__alloc () { return (int*)malloc(sizeof(int) * PM_size); }
+int *c4_list__alloc () { return (int*)malloc(sizeof(int) * LL_size); }
 int *c4_list_new (void *data, int *tail) {
 	int *l;
 	if(!(l = c4_list__alloc())) return 0;
@@ -573,7 +563,7 @@ int open_path(char *prefix, char *suffix, int mode) {
 	return fd;
 }
 
-char *read_module(char *path) {
+char *read_include(char *path) {
 	char **paths_it;
 	char  *paths_current;
 	int   fd, bytes;
@@ -585,13 +575,13 @@ char *read_module(char *path) {
 	if(verbose) dprintf(STDERR, "paths_it: 0x%X\n", paths_it);
 	if(verbose) dprintf(STDERR, "*paths_it: 0x%X\n", *paths_it);
 	while(*paths_it && fd <= 0) {
-		if(verbose) dprintf(STDERR, "Attempt to open module with path: '%s%s'\n", *paths_it, path);
+		if(verbose) dprintf(STDERR, "Attempt to open include with path: '%s%s'\n", *paths_it, path);
 		if((fd = open_path(*paths_it, path, 0)) < 0)
 			++paths_it;
 	}
 
 	if(fd < 0) {
-		dprintf(STDERR, "Unable to open module '%s'\n", path);
+		dprintf(STDERR, "Unable to open include '%s'\n", path);
 		return 0;
 	}
 
@@ -689,17 +679,17 @@ int partial_parse () {
 				next();
 			}
 		}
-		// module("path_to_file")
+		// include("path_to_file")
 		else if (tk == Module) {
-			if(verbose) { dprintf(STDERR, "enter module section\n"); }
+			if(verbose) { dprintf(STDERR, "enter include section\n"); }
 			next();
 			while(tk != '(') next(); next(); // skip (
 			next(); // read string into ival
 			while(tk != ')') next(); // skip )
-			if(verbose) { dprintf(STDERR, "  load module '%s'\n", (char*)ival); }
+			if(verbose) { dprintf(STDERR, "  load include '%s'\n", (char*)ival); }
 			// save current code position and load requested file
 			ptmp = p; linetmp = line;
-			p = read_module((char*)ival);
+			p = read_include((char*)ival);
 			if(pp = p) {
 				if(!code_pages_push_uniq(p)) {
 					free(p);
@@ -708,11 +698,11 @@ int partial_parse () {
 				} else if(verbose) dprintf(STDERR, "  code page successfully allocated\n");
 				ival = partial_parse();
 				if(!ival) {
-					dprintf(STDERR, "  partial_parse() failed in submodule\n");
+					dprintf(STDERR, "  partial_parse() failed in subinclude\n");
 					return 0;
-				} else if(verbose) dprintf(STDERR, "  module loaded successfully\n");
+				} else if(verbose) dprintf(STDERR, "  include loaded successfully\n");
 			}
-			if(verbose) dprintf(STDERR, "exit module section\n");
+			if(verbose) dprintf(STDERR, "exit include section\n");
 			p = ptmp; line = linetmp; // continue with processing
 			next(); // ensures tk == ;
 		}
@@ -1247,7 +1237,7 @@ int main(int argc, char **argv)
 	if(!(search_paths = (char**)malloc(SEARCH_PATHS_MAX * sizeof(char*)))) { dprintf(STDERR, "Failed to allocate search_paths\n"); return -1; }
 	// copy pointers for search paths
 	tmp = ".\0"              // default: use path as given
-	      "./c4_modules\0"   // c4_modules/
+	      "./c4_modules\0"   // c4_includes/
 	      "\0\0";            // end of list
 	i = 0;
 	while(*tmp) {
