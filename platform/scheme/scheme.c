@@ -725,7 +725,7 @@ int main(int argc, char **argv)
 	--argc; ++argv;
 	parse_args(argc, argv);
 
-#if 0
+#if __C4__
 	// Requires the scheme library
 	tmp = "scheme";
 	if(g_debug)
