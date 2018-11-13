@@ -9,14 +9,6 @@
         <group>
             <file>file:/home/daedalus/NetBeansProjects/lisp4/core/c4.c</file>
         </group>
-        <group name="C4">
-            <file>file:/home/daedalus/NetBeansProjects/lisp4/c4_modules/c4-internal/c4_src/test.c</file>
-            <file>file:/home/daedalus/NetBeansProjects/lisp4/c4_modules/c4-internal/lib_src/libinternal.c</file>
-            <file>file:/home/daedalus/NetBeansProjects/lisp4/platform/scheme/scheme.c</file>
-            <file>file:/home/daedalus/NetBeansProjects/lisp4/core/c4.c</file>
-            <file>file:/home/daedalus/NetBeansProjects/lisp4/core/syscalls.cpp</file>
-            <file>file:/home/daedalus/NetBeansProjects/lisp4/include/core/c4_module.h</file>
-            <file>file:/home/daedalus/NetBeansProjects/lisp4/platform/scheme/syscalls.c</file>
-        </group>
+        <group name="C4"/>
     </open-files>
 </project-private>
