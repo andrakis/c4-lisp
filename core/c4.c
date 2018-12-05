@@ -111,6 +111,10 @@ enum { STDIN, STDOUT, STDERR };
 // identifier offsets (since we can't create an ident struct)
 enum { Tk, Hash, Name, NameLen, Class, Type, Val, HClass, HType, HVal, Idsz };
 
+// Codepoint structure
+enum { CP_LINE, CP_START, CP_LEN, CP_E, CP_LE, codepoint_size };
+int *codepoint_base, *codepoint_ptr;
+
 int B_MAGIC;
 
 // Process members
@@ -231,12 +235,14 @@ void next()
 		++p;
 		if (tk == '\n') {         // newline handling
 			if (src) {
-				dprintf(STDERR, "%d: %.*s", line, p - lp, lp);
+				codepoint_ptr[CP_LINE]  = line;
+				codepoint_ptr[CP_START] = (int)lp;
+				codepoint_ptr[CP_LEN]   = (int)(p - lp);
+				codepoint_ptr[CP_E]     = (int)e;
+				codepoint_ptr[CP_LE]    = (int)le;
+				codepoint_ptr = codepoint_ptr + codepoint_size;
 				lp = p;
-				while (le < e) {
-					dprintf(STDERR, "%8.4s", &opcodes[*++le * 5]);
-					if (*le <= ADJ) dprintf(STDERR, " %d\n", *++le); else dprintf(STDERR, "\n");
-				}
+				le = e;
 			}
 			++line;
 		}
@@ -966,9 +972,16 @@ void process_setregisters(int *process, int *bp, int *sp, int *pc) {
 	process[B_pc] = (int)pc;
 }
 
+int c4_isprint (char c) {
+	// TODO: better
+	return c >= ' ' && c <= '~';
+}
+
 int *create_c_image (char *source, int *process) {
 	int *sp, *bp, *pc, *t, *idmain;
 	char *entry, **argv; int argc;
+	int *cp_ptr, cp_line, cp_len, *cp_e, *cp_le; char *cp_start;
+	char *data_ptr; int data_len;
 
 	entry = (char*)process[B_entry];
 	argc  = process[B_argc];
@@ -980,8 +993,61 @@ int *create_c_image (char *source, int *process) {
 	e = le = (int*)process[B_p_e];
 	data = (char*)process[B_p_data];
 
+	if(src) {
+		if(!(codepoint_base = malloc(poolsz))) {
+			dprintf(STDERR, "Unable to allocate %ld bytes for codepoints\n");
+			return 0;
+		}
+		codepoint_ptr = codepoint_base;
+	}
+
 	if(!parse(source)) {
 		return 0;
+	}
+
+	if(src) { // Print source
+		// Print data
+		dprintf(STDERR, ".origin data %ld", process[B_p_data]);
+		data_ptr = (char*)process[B_p_data]; // tmp: data segment
+		data_len = 0; // tmp: current number of chars
+		while(data_ptr <= data) {
+			if(data_len == 0) dprintf(STDERR, "\ndata %ld ", (int)data_ptr - process[B_p_data]);
+			if(c4_isprint(*data_ptr)) {
+				dprintf(STDERR, "%c", *data_ptr);
+				data_len = data_len + 1;
+			} else {
+				dprintf(STDERR, "\\%.2X", *data_ptr);
+				data_len = data_len + 3;
+			}
+			if(data_len >= 50) data_len = 0;
+			++data_ptr;
+		}
+		dprintf(STDERR, "\n");
+		// Print code
+		dprintf(STDERR, ".origin code %ld\n", process[B_p_e]);
+		cp_ptr = codepoint_base;
+		while(cp_ptr <= codepoint_ptr) {
+			cp_line  = cp_ptr[CP_LINE];
+			cp_start = (char*)cp_ptr[CP_START];
+			cp_len   = cp_ptr[CP_LEN];
+			cp_e     = (int*)cp_ptr[CP_E];
+			cp_le    = (int*)cp_ptr[CP_LE];
+			dprintf(STDERR, "%ld: %.*s", cp_line, cp_len, cp_start);
+			while (cp_le < cp_e) {
+				dprintf(STDERR, "%8.4s", &opcodes[*++cp_le * 5]);
+				if (*cp_le <= ADJ) {
+					t = (int*)*++cp_le;
+					if(t >= (int*)process[B_p_e] && t <= e)
+						dprintf(STDERR, " [.code + %ld]\n", e - t);
+					else if(t >= (int*)process[B_p_data] && t <= (int*)data)
+						dprintf(STDERR, " [.data + %ld]\n", (int*)data - t);
+					else
+						dprintf(STDERR, " %ld\n", t);
+				} else dprintf(STDERR, "\n");
+			}
+			cp_ptr = cp_ptr + codepoint_size;
+		}
+		free(codepoint_base);
 	}
 
 	idmain = lookup_symbol(entry, sym);
@@ -1379,21 +1445,22 @@ int main(int argc, char **argv)
 	// run...
 	i = 0;
 	exitcode = 0;
-	while(vm_proc_count > 0) {
-		process = (int*)vm_processes[i];
-		if(process) {
-			if(run_cycle(process, vm_cycle_count) == 1) {
-				// Finished
-				if(debug) dprintf(STDERR, "Proc %d finished: %d\n", i, process[B_exitcode]);
-				exitcode = process[B_exitcode];
-				free_process(process);
-				vm_processes[i] = 0;
-				--vm_proc_count;
+	if(!src)
+		while(vm_proc_count > 0) {
+			process = (int*)vm_processes[i];
+			if(process) {
+				if(run_cycle(process, vm_cycle_count) == 1) {
+					// Finished
+					if(debug) dprintf(STDERR, "Proc %d finished: %d\n", i, process[B_exitcode]);
+					exitcode = process[B_exitcode];
+					free_process(process);
+					vm_processes[i] = 0;
+					--vm_proc_count;
+				}
 			}
+			++i;
+			if(i == vm_proc_max) i = 0;
 		}
-		++i;
-		if(i == vm_proc_max) i = 0;
-	}
 
 	// Perform normal cleanup
 	early_exit();
