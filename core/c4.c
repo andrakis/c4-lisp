@@ -1032,15 +1032,18 @@ int *create_c_image (char *source, int *process) {
 			cp_len   = cp_ptr[CP_LEN];
 			cp_e     = (int*)cp_ptr[CP_E];
 			cp_le    = (int*)cp_ptr[CP_LE];
-			dprintf(STDERR, "%ld: %.*s", cp_line, cp_len, cp_start);
+			dprintf(STDERR, " # %ld: %.*s", cp_line, cp_len, cp_start);
+			if(cp_le < cp_e) {
+				dprintf(STDERR, ".hint code offset %ld\n", cp_le - (int*)process[B_p_e]);
+			}
 			while (cp_le < cp_e) {
 				dprintf(STDERR, "%8.4s", &opcodes[*++cp_le * 5]);
 				if (*cp_le <= ADJ) {
 					t = (int*)*++cp_le;
 					if(t >= (int*)process[B_p_e] && t <= e)
-						dprintf(STDERR, " [.code + %ld]\n", e - t);
+						dprintf(STDERR, " [.code + %ld]\n", t - (int*)process[B_p_e]);
 					else if(t >= (int*)process[B_p_data] && t <= (int*)data)
-						dprintf(STDERR, " [.data + %ld]\n", (int*)data - t);
+						dprintf(STDERR, " [.data + %ld]\n", t - (int*)process[B_p_data]);
 					else
 						dprintf(STDERR, " %ld\n", t);
 				} else dprintf(STDERR, "\n");
