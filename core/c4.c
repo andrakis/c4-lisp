@@ -60,6 +60,7 @@ enum {
 	OR  ,XOR ,AND ,EQ  ,NE  ,LT  ,GT  ,LE  ,GE  ,SHL ,SHR ,ADD ,SUB ,MUL ,DIV ,MOD ,
 	// C functions
 	OPEN,READ,CLOS,PRTF,DPRT,MALC,FREE,MSET,MCMP,EXIT,FDSZ,
+	GETC,PUTC,
 	// Platform related functions
 	PINI,RPTH,PLGT,
 	// VM related functions
@@ -78,6 +79,7 @@ void setup_opcodes() {
 		"SC  ,PSH ,OR  ,XOR ,AND ,EQ  ,NE  ,LT  ,GT  ,LE  ,GE  ,SHL ,"
 		"SHR ,ADD ,SUB ,MUL ,DIV ,MOD ,"
 		"OPEN,READ,CLOS,PRTF,DPRT,MALC,FREE,MSET,MCMP,EXIT,FDSZ,"
+		"GETC,PUTC",
 		"PINI,RPTH,PLGT,"
 		"PCHG,"
 		"SYS1,SYS2,SYS3,SYS4,SYS5,SYS6,SYSI,SYSM";
@@ -91,6 +93,7 @@ void setup_symbols() {
 		"char else enum if int return sizeof include while "
 		// C functions
 		"open read close printf dprintf malloc free memset memcmp exit fdsize "
+		"getchar putchar "
 		// Dynamic runtime platform functions
 		"platform_init runtime_path platform_get "
 		"process_changed "
@@ -902,6 +905,8 @@ int run_cycle(int *process, int cycles) {
 			process[B_exitcode] = *sp;
 			rem_cycle = 0;
 		}
+		else if (i == GETC) { a = (int)getchar(); }
+		else if (i == PUTC) { a = putchar(*sp); }
 		else if (i == SYS1) { a = (int)syscall1(*sp); }
 		else if (i == SYS2) { a = (int)syscall2(sp[1], *sp); }
 		else if (i == SYS3) { a = (int)syscall3(sp[2], sp[1], *sp); }
