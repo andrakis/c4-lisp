@@ -1005,7 +1005,7 @@ int *create_c_image (char *source, int *process) {
 		return 0;
 	}
 
-	if(src) { // Print source
+	if(src == 1) { // Print source
 		// Print data
 		dprintf(STDERR, ".origin data %ld", process[B_p_data]);
 		data_ptr = (char*)process[B_p_data]; // tmp: data segment
@@ -1050,6 +1050,43 @@ int *create_c_image (char *source, int *process) {
 			}
 			cp_ptr = cp_ptr + codepoint_size;
 		}
+		free(codepoint_base);
+	} else if(src == 2) { // Print source in hex mode
+		// Print data
+		dprintf(STDERR, ".DATA\n");
+		data_ptr = (char*)process[B_p_data]; // tmp: data segment
+		data_len = 0; // tmp: current number of chars
+		while(data_ptr <= data) {
+			if(c4_isprint(*data_ptr)) {
+				dprintf(STDERR, "%c", *data_ptr);
+				data_len = data_len + 1;
+			} else {
+				dprintf(STDERR, "\\%.2X", *data_ptr);
+				data_len = data_len + 3;
+			}
+			if(data_len == 0) dprintf(STDERR, "\n");
+			if(data_len >= 50) data_len = 0;
+			++data_ptr;
+		}
+		dprintf(STDERR, "\n");
+		// Print code
+		cp_ptr = (int*)process[B_p_e];
+		// line break counter
+		cp_len = 0;
+		dprintf(STDERR, ".CODE\n");
+		while(cp_ptr <= e) {
+			if(++cp_len % sizeof(int) == 0) {
+				dprintf(STDERR, "\n");
+			}
+			if(sizeof(int) == 4) {
+				dprintf(STDERR, "%X ", *cp_ptr++);
+			} else if(sizeof(int) == 8) {
+				dprintf(STDERR, "%X ", *cp_ptr++);
+			} else {
+				dprintf(STDERR, "\\%ld ", *cp_ptr++);
+			}
+		}
+		if(cp_len) dprintf(STDERR, "\n");
 		free(codepoint_base);
 	}
 
@@ -1254,8 +1291,29 @@ void free_process(int *process) {
 	if( (ptr = (void*)process)) free(ptr);
 }
 
+// Early exit reasons
+enum /* EarlyExits */ {
+	EE_ALLOC_PROCS,        // Failed to allocate procs
+	EE_ALLOC_PATHS,        // Failed to allocate search paths
+	EE_ALLOC_PAGES,        // Failed to allocate code pages
+	EE_ENTER_LISP,         // Entering Lisp module
+	EE_NO_PROCS,           // No processes to run
+	EE_NONE                // Not an early exit (normal cleanup)
+};
+
+// Perform actions (mostly freeing memory) that should occur before the application exits
+void early_exit (int reason) {
+	if(reason > EE_ALLOC_PROCS) free((void*)vm_processes);
+	if(reason > EE_ALLOC_PATHS) free((void*)search_paths);
+	if(reason > EE_ALLOC_PAGES) code_pages_free();
+}
+
 int c5_lispmain(int argc, char **argv) {
 	int result;
+
+	// Clear C4 memory
+	early_exit(EE_ENTER_LISP);
+
 	// Requires libscheme
 	if(platform_init(runtime_path("scheme"))) {
 		return 1;
@@ -1265,13 +1323,6 @@ int c5_lispmain(int argc, char **argv) {
 	result = syscall_main(argc, argv);
 	platform_init(0);
 	return result;
-}
-
-// Perform actions (mostly freeing memory) that should occur before the application exits
-void early_exit () {
-	free((void*)vm_processes);
-	free((void*)search_paths);
-	code_pages_free();
 }
 
 // Override name when compiling natively
@@ -1289,7 +1340,11 @@ int main(int argc, char **argv)
 	setup_opcodes();
 	sym = le = e = 0;
 	data = 0;
-	B_MAGIC = 0xBEEF;
+	// Construct a number to match number of bytes
+	B_MAGIC = sizeof(int) << sizeof(int) << sizeof(int) << sizeof(int);
+	// Overwrite some of it
+	B_MAGIC = B_MAGIC ^ (int)0xDEADBEEF;
+
 	verbose = 0;
 	vm_cycle_count = 1000;
 	poolsz = 256*1024; // arbitrary size
@@ -1298,12 +1353,20 @@ int main(int argc, char **argv)
 	// Allocate vm_processes
 	vm_proc_max = 32;
 	vm_proc_count = 0;
-	if (!(vm_processes = (int*)malloc(vm_proc_max * sizeof(int*)))) { dprintf(STDERR, "Failed to allocate vm_processes area\n"); return -1; }
+	if (!(vm_processes = (int*)malloc(vm_proc_max * sizeof(int*)))) {
+		early_exit(EE_ALLOC_PROCS);
+		dprintf(STDERR, "Failed to allocate vm_processes area\n");
+		return -1;
+	}
 	memset(vm_processes, 0, vm_proc_max * sizeof(int*));
 	vm_active_process = 0;
 
 	// Allocate search paths
-	if(!(search_paths = (char**)malloc(SEARCH_PATHS_MAX * sizeof(char*)))) { dprintf(STDERR, "Failed to allocate search_paths\n"); return -1; }
+	if(!(search_paths = (char**)malloc(SEARCH_PATHS_MAX * sizeof(char*)))) {
+		early_exit(EE_ALLOC_PATHS);
+		dprintf(STDERR, "Failed to allocate search_paths\n");
+		return -1;
+	}
 	// copy pointers for search paths
 	tmp = ".\0"              // default: use path as given
 	      "./c4_modules\0"   // c4_includes/
@@ -1319,13 +1382,20 @@ int main(int argc, char **argv)
 
 	// Allocate first code page
 	code_pages = c4_list_new(0, 0); // empty entry as tail
+	if(!code_pages) {
+		early_exit(EE_ALLOC_PAGES);
+		dprintf(STDERR, "Failed to allocate code pages\n");
+		return -1;
+	}
 
 	--argc; ++argv;
 	early_param_exit = 0; // when to exit parameter parsing
 	while(argc > 0 && **argv == '-' && early_param_exit == 0) {
 		ch = (*argv)[1];
 		// -s      show source and exit
-		if ((*argv)[1] == 's') { src = 1; }
+		if (ch == 's') { src = 1; }
+		// -X      show source in hex mode and exit
+		else if (ch == 'X') { src = 2; }
 		// -d      show source during execution
 		else if (ch == 'd') { debug = 1; }
 		// -c 123  set cycle count to 123
@@ -1364,18 +1434,15 @@ int main(int argc, char **argv)
 		}
 		// -L      enter lispmain
 		else if(ch == 'L') {
-#if 0  // Run under c4 only
+#if __C4__  // Run under c4 only
 			// start lisp4.c instead, and end parameter passing
 			vm_processes[vm_proc_count++] = (int)"lisp4.c";
 			early_param_exit = 1;
 			++argc; --argv; // set arguments correctly
-			if(0) // Dummy out the next call
-#else
-				early_exit();
-#if 0
+#if __C4__
 			if(0) // Dummy out the next call
 #endif
-			return c5_lispmain(argc, argv);
+				return c5_lispmain(argc, argv);
 #endif
 		}
 		// -v      enable verbose mode
@@ -1389,6 +1456,7 @@ int main(int argc, char **argv)
 			printf("usage: %s [-L] [-s] [-d] [-v] [-c nn] [-r file] [-p [+]nn] file args...\n", argv0);
 			printf("    -L            Load default platform library, and enter main\n");
 			printf("    -s            Print source and exit\n");
+			printf("    -X            Print source in hex mode and exit\n");
 			printf("    -d            Enable debugging mode\n");
 			printf("    -v            Enable verbose mode\n");
 			printf("    -c nn         Set process cycle count to nnn\n");
@@ -1404,17 +1472,18 @@ int main(int argc, char **argv)
 			printf("    number size : %i bytes\n", sizeof(int));
 			printf("    pointer size: %i bytes\n", sizeof(void*));
 			printf("    process size: %i bytes (%i words)\n", sizeof(int) * __B, __B);
+			early_exit(EE_NO_PROCS);
 			return 1;
 		} else {
 			dprintf(STDERR, "Invalid argument: %s, try -h\n", *argv);
-			early_exit();
+			early_exit(EE_NO_PROCS);
 			return -1;
 		}
 		--argc; ++argv;
 	}
 	if (vm_proc_count < 1 && argc < 1) {
-		early_exit();
 		dprintf(STDERR, "usage: %s [-L] [-s] [-d] [-v] [-c nn] [-r file] [-p nn] [-M] file args...\n", argv0);
+		early_exit(EE_NO_PROCS);
 		return -1;
 	}
 	// Only add next arg as process if early parameter parsing was not invoked
@@ -1466,7 +1535,7 @@ int main(int argc, char **argv)
 		}
 
 	// Perform normal cleanup
-	early_exit();
+	early_exit(EE_NONE);
 
 	return exitcode;
 }
