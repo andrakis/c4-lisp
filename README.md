@@ -9,7 +9,7 @@ It features an expanded C4 interpreter, with the ability to load from dynamic li
 
 
 Goals
------
+=====
 
 This project aims to provide a virtual machine that can run multiple lisp interpreters in a single process, switching
 between those processes in a pre-emptive tasking fashion.
@@ -18,11 +18,28 @@ The Lisp interpreter is based on the classic [90(++)-line scheme interpreter](ht
 
 As with [Elispidae](https://github.com/andrakis/elispidae), the project will eventually use C++14's shared pointers and contain an extended type system.
 
+Building and running
+====================
+
+The project was created in NetBeans v 8.1, and should work in any later versions too.
+
+The NetBeans-created Makefile serves as the main way to compile the project.
+
+Targets
+-------
+
+* Debug (default): `make CONFIG=Debug` or just `make`
+
+* Release: `make CONFIG=Release`
+
+Both targets support custom compilers using the standard `CC=` and `CXX=`.
+
+* For instance to build for OpenRISC, one may use `make CC=or1k-linux-musl-gcc CXX=or1k-linux-musl-g++ CXXFLAGS="-D__EMSCRIPTEN__ -static" CCFLAGS="-static"`
 
 Accomplished Goals
-------------------
+===================
 
-* A tail recurse Scheme/Lisp interpreter. Uses strings for most values, except for Lists and Procs.
+* A tail recursive Scheme/Lisp interpreter. Uses strings for most values, except for Lists and Procs.
 
 * Standard test library (used in above 90(++)-line scheme interperter) passes successfuly.
 
@@ -38,7 +55,7 @@ Care is taken to ensure code runs the same in both the C4 interpreter and in nat
 
 
 Extensions to C4
-----------------
+=================
 
 * Support for <code>/* C style comments */</code>
 
