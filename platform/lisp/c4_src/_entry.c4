@@ -1,0 +1,21 @@
+/**
+ * Entry point for Lisp on C4.
+ * Do not try to run this file manually.
+ */
+
+// Anything else?
+
+int main (int argc, char **argv) {
+	// Initialize globals
+	silent = 1;
+	exitflag = 1;
+
+	// Run tests
+	if(list_tests())
+		die("List test failed");
+	if(cell_tests())
+		die("Cell test failed");
+	return 0;
+}
+
+/* vim: set syntax=c :*/

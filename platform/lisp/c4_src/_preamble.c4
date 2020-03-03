@@ -1,0 +1,23 @@
+/**
+ * Preamble for Lisp on C4.
+ * Do not try to run this file manually.
+ *
+ * Specifies globals and some useful functions.
+ */
+
+// For compilation by gcc, we include this here
+#include "../../../include/core/c5_native.h"
+
+enum { STDIN, STDOUT, STDERR };
+
+// Global flags
+int silent;         // Silence testing info?
+int exitflag;       // Used in die()
+
+// die(String) => exit()
+void die (char *s) {
+	dprintf(STDERR, "Died: %s\n", s);
+	exit(exitflag);
+}
+
+/* vim: set syntax=c :*/
